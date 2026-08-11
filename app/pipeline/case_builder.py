@@ -18,9 +18,11 @@ import pandas as pd
 from thefuzz import fuzz, process
 
 from app.data import loaders
+from app.data.agc import ensure_agc_asignado
 from app.data.download import ensure_data_for_date
 from app.data.ofei import parse_ofei
 from app.data.paths import resolve_input
+from app.data.xm_bulk import ensure_bulk_data_for_year
 from app.schemas.bess import BessScenario
 from app.schemas.case import DispatchCase, DispatchLevel
 from app.schemas.input_pack import InputPack
@@ -75,16 +77,17 @@ def build_case(
     storage = get_storage(dd)
 
     ensure_data_for_date(DISPATCH_DATE, data_dir=dd)
+    ensure_bulk_data_for_year(DISPATCH_DATE.year, data_dir=dd)
 
     # --- Load root CSVs ---
+    year = DISPATCH_DATE.year
     if case.level == DispatchLevel.ideal:
-        dispo_come = loaders.load_dispo_come(dd)
-    dispo = loaders.load_dispo(dd)
-    ofertas = loaders.load_ofertas(dd)
-    demanda = loaders.load_demanda(dd)
-    agc_asignado = loaders.load_agc(dd)
+        dispo_come = loaders.load_dispo_come(dd, year)
+    dispo = loaders.load_dispo(dd, year)
+    ofertas = loaders.load_ofertas(dd, year)
+    demanda = loaders.load_demanda(dd, year)
     parametros_plantas = loaders.load_parametros_plantas(dd)
-    precio_bolsa = loaders.load_precio_bolsa(dd)
+    precio_bolsa = loaders.load_precio_bolsa(dd, year)
 
     # --- Parse OFEI ---
     ofei_path = resolve_input("OFEI", DISPATCH_DATE, dd)
@@ -99,8 +102,19 @@ def build_case(
     # --- Filter data by date ---
     dispo = dispo[(dispo.datetime.dt.date == DISPATCH_DATE) & (dispo["resource_name"].notnull())]
     dispo = dispo.drop_duplicates(subset=["resource_name", "datetime"])
+    ensure_agc_asignado(DISPATCH_DATE, dd, resource_names=list(dispo["resource_name"].unique()))
+    agc_asignado = loaders.load_agc(dd, DISPATCH_DATE)
     oferta_full = ofertas.copy()
     ofertas = ofertas[ofertas.Date.dt.date == DISPATCH_DATE]
+    if ofertas.empty:
+        raise ValueError(
+            f"no hay ofertas (PrecOferDesp) publicadas por XM para {DISPATCH_DATE}. "
+            "XM publica PrecOferDesp por mes calendario completo, un mes despues "
+            "(agosto completo solo esta disponible desde el 1 de septiembre) -- "
+            "intente con una fecha de un mes ya cerrado, o ver GH issue "
+            "'heuristica de precios de oferta para fechas recientes' para el "
+            "enfoque planeado a futuro."
+        )
     agc_asignado = agc_asignado[agc_asignado["datetime"].dt.date == DISPATCH_DATE]
     demanda = demanda[demanda["datetime"].dt.date == DISPATCH_DATE]
     precio_bolsa = precio_bolsa[precio_bolsa["datetime"].dt.date == DISPATCH_DATE]

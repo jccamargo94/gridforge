@@ -283,3 +283,45 @@ def test_ensure_bulk_data_for_year_skips_crosswalk_when_not_needed(tmp_path, mon
     # But both demaCome and precio_bolsa should be fetched and created
     assert (tmp_path / "demaCome" / "demaCome_2024.csv").exists()
     assert (tmp_path / "precio_bolsa" / "precio_bolsa_2024.csv").exists()
+
+
+def test_dema_come_all_midnight_rows_have_full_datetime_format(tmp_path):
+    """Regression test for pandas CSV writer mixing datetime formats.
+
+    When all melted rows are exactly midnight (edge case from melt ordering),
+    pandas' CSV writer must format them with full HH:MM:SS, not bare YYYY-MM-DD.
+    This test ensures the date_format argument is present and working.
+    """
+
+    # Fake consult returns only Hour01, so all melted rows are midnight (hour_num=0).
+    class _FakeConsultMidnightOnly:
+        def request_data(self, coleccion, metrica, start_date, end_date):
+            return pd.DataFrame(
+                {
+                    "Values_code": ["Sistema"],
+                    "Values_Hour01": [8_300_000.0],  # Only Hour01, no Hour02+
+                    "Date": [date(2024, 4, 18)],
+                }
+            )
+
+    ensure_dema_come(2024, str(tmp_path), _FakeConsultMidnightOnly())
+
+    # Read the raw CSV text to check datetime format
+    csv_path = tmp_path / "demaCome" / "demaCome_2024.csv"
+    with open(csv_path, "r") as f:
+        content = f.read()
+
+    lines = content.strip().split("\n")
+    assert len(lines) >= 2  # header + at least 1 data row
+
+    # Verify every datetime cell (all rows after header) has HH:MM:SS format
+    for line in lines[1:]:
+        # Format: datetime,dema
+        # e.g., "2024-04-18 00:00:00,8300000.0"
+        parts = line.split(",", 1)
+        datetime_str = parts[0]
+        # Must have the space and time components
+        assert " " in datetime_str, f"datetime missing time part: {datetime_str}"
+        # Must match YYYY-MM-DD HH:MM:SS pattern (19 chars total)
+        assert len(datetime_str) == 19, f"datetime has wrong format: {datetime_str}"
+        assert datetime_str.count(":") == 2, f"datetime missing colons: {datetime_str}"

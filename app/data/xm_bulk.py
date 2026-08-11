@@ -56,7 +56,7 @@ def ensure_dispo_declarada(
         ["datetime", "resource_name", "dispo", "gen_type"]
     ]
     with storage.open(path, "w") as f:
-        merged.to_csv(f, index=False)
+        merged.to_csv(f, index=False, date_format="%Y-%m-%d %H:%M:%S")
     if session is not None:
         upsert_input_dataset(
             session,
@@ -78,7 +78,7 @@ def ensure_dispo_come(
     long = _melt_hourly(raw, "dispo")
     merged = long.merge(crosswalk, on="code", how="inner")[["datetime", "resource_name", "dispo"]]
     with storage.open(path, "w") as f:
-        merged.to_csv(f, index=False)
+        merged.to_csv(f, index=False, date_format="%Y-%m-%d %H:%M:%S")
     if session is not None:
         upsert_input_dataset(
             session,
@@ -120,7 +120,7 @@ def ensure_dema_come(year: int, data_dir: str, consult, session=None) -> None:
     raw = consult.request_data("DemaCome", "Sistema", date(year, 1, 1), date(year, 12, 31))
     long = _melt_hourly(raw, "dema")[["datetime", "dema"]]
     with storage.open(path, "w") as f:
-        long.to_csv(f, index=False)
+        long.to_csv(f, index=False, date_format="%Y-%m-%d %H:%M:%S")
     if session is not None:
         upsert_input_dataset(
             session,
@@ -139,7 +139,7 @@ def ensure_precio_bolsa(year: int, data_dir: str, consult, session=None) -> None
     raw = consult.request_data("PrecBolsNaci", "Sistema", date(year, 1, 1), date(year, 12, 31))
     long = _melt_hourly(raw, "precio_bolsa")[["datetime", "precio_bolsa"]]
     with storage.open(path, "w") as f:
-        long.to_csv(f, index=False)
+        long.to_csv(f, index=False, date_format="%Y-%m-%d %H:%M:%S")
     if session is not None:
         upsert_input_dataset(
             session,

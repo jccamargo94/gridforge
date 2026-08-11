@@ -45,6 +45,15 @@ def test_parse_mpo_raises_when_no_mpo_row():
         assert "MPO" in str(e)
 
 
+def test_parse_mpo_raises_when_mpo_row_has_fewer_than_24_values():
+    raw = '"MPO",' + ",".join(["1.0"] * 10)
+    try:
+        parse_mpo(raw)
+        assert False, "esperaba ValueError"
+    except ValueError as e:
+        assert "24" in str(e)
+
+
 def test_detect_marginal_resolves_unique_candidate_hour():
     # TERMO1 a media maquina solo en la hora 5; nadie mas es candidato ahi.
     predespacho = {
@@ -57,6 +66,15 @@ def test_detect_marginal_resolves_unique_candidate_hour():
     }
     resolved = detect_marginal_resources(predespacho, dispo_declarada)
     assert resolved == {"TERMO1": 5}
+
+
+def test_detect_marginal_skips_resource_with_incomplete_hourly_dispo():
+    # dispo_declarada con menos de 24 horas para un recurso (dia parcial en
+    # el CSV origen) no debe reventar con IndexError -- se descarta.
+    predespacho = {"TERMO1": [150.0] * 24}
+    dispo_declarada = {"TERMO1": [300.0] * 23}
+    resolved = detect_marginal_resources(predespacho, dispo_declarada)
+    assert resolved == {}
 
 
 def test_detect_marginal_ambiguous_hour_resolves_nothing_for_that_hour():

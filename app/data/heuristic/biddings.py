@@ -35,7 +35,12 @@ def parse_mpo(raw_text: str) -> list[float]:
     """iMAR: filas 'Costo Marginal'/'Delta'/'MPO', 24 valores cada una (COP/MWh)."""
     for line in csv.reader(io.StringIO(raw_text)):
         if line and line[0].strip().strip('"') == "MPO":
-            return [float(v) for v in line[1:25]]
+            values = [float(v) for v in line[1:25]]
+            if len(values) != 24:
+                raise ValueError(
+                    f"la fila 'MPO' del archivo iMAR trae {len(values)} valores, se esperaban 24"
+                )
+            return values
     raise ValueError("no se encontro la fila 'MPO' en el archivo iMAR")
 
 
@@ -60,7 +65,10 @@ def detect_marginal_resources(
     candidates: dict[int, set[str]] = {h: set() for h in _HOURS}
     for resource, despacho in predespacho.items():
         disponible = dispo_declarada.get(resource)
-        if disponible is None:
+        # ponytail: ambos parsers garantizan 24 valores, pero dispo_declarada
+        # viene de un groupby externo (horas incompletas para el recurso ese
+        # dia) -- se descarta en vez de reventar con IndexError mas abajo.
+        if disponible is None or len(disponible) != 24 or len(despacho) != 24:
             continue
         for h in _HOURS:
             if 0 < despacho[h] < disponible[h]:

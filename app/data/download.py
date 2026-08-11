@@ -33,7 +33,7 @@ XM_BLOB_CONTAINER = "storageportalxm"
 
 def _blob_filename(file_type: str, file_date: date) -> str:
     """Compute the blob filename without extension (e.g., 'OFEI0418' or 'PrId0418_NAL')."""
-    complement = "_NAL" if file_type in {"PrId", "iMAR"} else ""
+    complement = "_NAL" if file_type == "PrId" else ""
     return f"{file_type}{file_date.month:0>2}{file_date.day:0>2}{complement}"
 
 

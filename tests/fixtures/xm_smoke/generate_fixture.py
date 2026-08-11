@@ -114,10 +114,10 @@ with open(flat_dir / f"dCondIniP{MMDD}.txt", "w") as f:
 
 (flat_dir / f"dCondIniU{MMDD}.txt").write_text("Recurso,Tipo,Gini-1,Cini-1\n")
 
-imar_lines = []
-for g in GENERATORS:
-    imar_lines.append(f"{g['name']},0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
-(flat_dir / f"iMAR{MMDD}_NAL.txt").write_text("\n".join(imar_lines) + "\n")
+mpo_row = ",".join(["150000.00"] * 24)
+delta_row = ",".join(["0.00"] * 24)
+imar_lines = [f'"Costo Marginal",{mpo_row}', f'"Delta",{delta_row}', f'"MPO",{mpo_row}']
+(flat_dir / f"iMAR{MMDD}.txt").write_text("\n".join(imar_lines) + "\n")
 
 agcu_lines = []
 for g in GENERATORS:

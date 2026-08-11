@@ -39,7 +39,7 @@ def test_ensure_data_for_date_skips_when_all_files_exist(monkeypatch, tmp_path):
     (tmp_path / "2024-04-18" / "dCondIniU0418.txt").write_text("existing")
     (tmp_path / "2024-04-18" / "dCondIniP0418.txt").write_text("existing")
     (tmp_path / "2024-04-18" / "PrId0418_NAL.txt").write_text("existing")
-    (tmp_path / "2024-04-18" / "iMAR0418_NAL.txt").write_text("existing")
+    (tmp_path / "2024-04-18" / "iMAR0418.txt").write_text("existing")
     (tmp_path / "2024-04-18" / "dAGCUNIDAD0418.txt").write_text("existing")
 
     def _boom(*a, **k):

@@ -36,6 +36,15 @@ def test_prid_nal_suffix(tmp_path):
     assert resolve_input("PrId", d, str(tmp_path)).endswith("PrId0418_NAL.txt")
 
 
+def test_imar_has_no_nal_suffix(tmp_path):
+    d = date(2024, 4, 18)
+    live = tmp_path / "2024-04-18"
+    live.mkdir()
+    (live / "iMAR0418.txt").write_text("x")
+    assert resolve_input("iMAR", d, str(tmp_path)).endswith("iMAR0418.txt")
+    assert not resolve_input("iMAR", d, str(tmp_path)).endswith("_NAL.txt")
+
+
 def test_missing_lists_tried_paths(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
         resolve_input("OFEI", date(2024, 4, 18), str(tmp_path))

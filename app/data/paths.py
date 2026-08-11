@@ -27,7 +27,7 @@ CANDIDATE_SUBDIRS = {
 
 def _filename(kind: str, dispatch_date: date) -> str:
     mmdd = f"{dispatch_date.month:0>2}{dispatch_date.day:0>2}"
-    complement = "_NAL" if kind in {"PrId", "iMAR"} else ""
+    complement = "_NAL" if kind == "PrId" else ""
     return f"{kind}{mmdd}{complement}.txt"
 
 

@@ -170,11 +170,29 @@ def build_case(
     )
 
     # --- Initial conditions ---
+    # dCondIniP's real XM schema (Planta/AGC/.../ESTADOPINI1/GPPINI_1/CONFPINI1/.../TL/TFL/...)
+    # is unrelated to the old Recurso/Tipo/Gpini-1/Conf_Pini-1/T_CONF_Pini-1 columns this
+    # code was written against (see issue #34) -- normalize the 5 fields actually used
+    # downstream. Verified against real XM files for 2026-05-15/08-01/08-02/08-03:
+    # ESTADOPINI1 == "NA" <-> gen_type == HIDRAULICA (85-row cross-check, 0 mismatches);
+    # TL tracks continuous online duration (matches TFL==0 exactly whenever GPPINI_1 > 0
+    # across 85 rows, and resets to 0 in lockstep with TFL going nonzero on an
+    # online->offline transition) -- the real-schema analog of "time already committed",
+    # which is all T_CONF_Pini-1 is used for (Ton / min-up-time initial state).
     with open(resolve_input("dCondIniP", DISPATCH_DATE, dd), "r") as file:
         data = file.readlines()
-        data = [line.strip().split(",") for line in data]
+        data = [[field.strip() for field in line.strip().split(",")] for line in data]
         headers = data.pop(0)
-    condicion_inicial_planta = pd.DataFrame(data, columns=headers)
+    condicion_inicial_planta_raw = pd.DataFrame(data, columns=headers)
+    condicion_inicial_planta = pd.DataFrame(
+        {
+            "Recurso": condicion_inicial_planta_raw["Planta"],
+            "Tipo": np.where(condicion_inicial_planta_raw["ESTADOPINI1"] == "NA", "H", "T"),
+            "Gpini-1": condicion_inicial_planta_raw["GPPINI_1"],
+            "Conf_Pini-1": condicion_inicial_planta_raw["CONFPINI1"],
+            "T_CONF_Pini-1": condicion_inicial_planta_raw["TL"],
+        }
+    )
 
     with open(resolve_input("dCondIniU", DISPATCH_DATE, dd), "r") as file:
         data = file.readlines()
@@ -276,7 +294,8 @@ def build_case(
     initial_condition_df = pd.concat(
         [initial_condition_df, condicion_inicial_planta_termicas], ignore_index=True
     )
-    initial_condition_df = initial_condition_df.astype({"T_CONF_Pini-1": int, "Gpini-1": float})
+    initial_condition_df = initial_condition_df.astype({"T_CONF_Pini-1": float, "Gpini-1": float})
+    initial_condition_df["T_CONF_Pini-1"] = initial_condition_df["T_CONF_Pini-1"].astype(int)
 
     # --- Initial set to model ---
     gen_on = initial_condition_df[initial_condition_df["Gpini-1"] != 0]["Recurso"].unique()
@@ -311,19 +330,35 @@ def build_case(
     }
     minimo_operativo["resource"] = minimo_operativo["resource"].apply(lambda x: MO_map.get(x, x))
 
+    if precio_arranque.empty:
+        # See issue #38: XM's live OFEI no longer publishes PAP records (0 in a real
+        # 2026 file vs 678 in a real 2024 one) -- cold_start silently defaults to 0
+        # for every fuel generator (pyomo Param default) until #38 is resolved.
+        print(
+            "...OFEI no tiene registros PAP para esta fecha (ver issue #38): "
+            "cold_start quedara en 0 para todos los generadores termicos."
+        )
+
     generators_pap_map = {
-        gen: process.extractOne(
-            query=gen.lower(),
-            choices=precio_arranque.resource.unique(),
-            scorer=fuzz.partial_token_sort_ratio,
-            processor=lambda x: x.lower().replace(" ", ""),
-            score_cutoff=70,
-        )[0]
+        gen: results[0]
         for gen in fuel_generators
+        if (
+            results := process.extractOne(
+                query=gen.lower(),
+                choices=precio_arranque.resource.unique(),
+                scorer=fuzz.partial_token_sort_ratio,
+                processor=lambda x: x.lower().replace(" ", ""),
+                score_cutoff=70,
+            )
+        )
     }
 
     cold_start = {}
     for gen in fuel_generators:
+        if gen not in generators_pap_map:
+            if not precio_arranque.empty:
+                print(f"...no se pudo mapear precio de arranque (PAP) para {gen}. Se ignora.")
+            continue
         gen_name_mapped = generators_pap_map[gen]
         gen_pap = precio_arranque[
             (precio_arranque["resource"] == gen_name_mapped)

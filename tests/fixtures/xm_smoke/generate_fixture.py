@@ -22,8 +22,9 @@ GENERATORS = [
         "pap_cop": 1_500_000,
         "mo": 10,
         "gpini": 150,
-        "conf": "CONF1",
-        "tconf": 5,
+        "conf": 1,
+        "tl": 5,
+        "tfl": 0,
     },
     {
         "name": "TERMO2",
@@ -32,8 +33,9 @@ GENERATORS = [
         "pap_cop": 1_500_000,
         "mo": 5,
         "gpini": 0,
-        "conf": "CONF0",
-        "tconf": 0,
+        "conf": 0,
+        "tl": 0,
+        "tfl": 10,
     },
 ]
 
@@ -107,10 +109,26 @@ for g in GENERATORS:
 prid_row = ["TOTAL"] + ["350"] * 24
 (flat_dir / f"PrId{MMDD}_NAL.txt").write_text(",".join(prid_row) + "\n", encoding="latin1")
 
+# Real XM schema (issue #34) -- Planta/ESTADOPINI1/GPPINI_1/CONFPINI1/TL/TFL, not the
+# Recurso/Tipo/Gpini-1/Conf_Pini-1/T_CONF_Pini-1 layout this fixture used to assume.
+DCONDINIP_HEADER = (
+    "Planta ,AGC, BLOQUESPINI1, CONFENTRADA, CONFPINI1, CONFSALIDA, DISPPINI1, "
+    "ESTADOPINI1, GPPINI_1, GPPINI_2, NARRANQUESPINI1, PRUEBAS, TAPUBLICAR, "
+    "TCEPENDIENTE, TDISPPINI1, TFL, TL, TULT\n"
+)
+
+
+def dcondinip_row(g: dict) -> str:
+    return (
+        f"{g['name']}, 0, 0, 0, {g['conf']}, 0, {g['gpini']},  - , "
+        f"{g['gpini']:.4f}, {g['gpini']:.4f}, 0, 0, 10, 0, {g['tl']}, {g['tfl']}, {g['tl']}, 0\n"
+    )
+
+
 with open(flat_dir / f"dCondIniP{MMDD}.txt", "w") as f:
-    f.write("Recurso,Tipo,Gpini-1,Conf_Pini-1,T_CONF_Pini-1\n")
+    f.write(DCONDINIP_HEADER)
     for g in GENERATORS:
-        f.write(f"{g['name']},T,{g['gpini']},{g['conf']},{g['tconf']}\n")
+        f.write(dcondinip_row(g))
 
 (flat_dir / f"dCondIniU{MMDD}.txt").write_text("Recurso,Tipo,Gini-1,Cini-1\n")
 
@@ -125,9 +143,9 @@ for g in GENERATORS:
 (flat_dir / f"dAGCUNIDAD{MMDD}.txt").write_text("\n".join(agcu_lines) + "\n")
 
 with open(ci_dir / f"dCondIniP{MMDD}.txt", "w") as f:
-    f.write("Recurso,Tipo,Gpini-1,Conf_Pini-1,T_CONF_Pini-1\n")
+    f.write(DCONDINIP_HEADER)
     for g in GENERATORS:
-        f.write(f"{g['name']},T,{g['gpini']},{g['conf']},{g['tconf']}\n")
+        f.write(dcondinip_row(g))
 
 (ci_dir / f"dCondIniU{MMDD}.txt").write_text("Recurso,Tipo,Gini-1,Cini-1\n")
 

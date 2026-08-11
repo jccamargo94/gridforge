@@ -314,13 +314,18 @@ descargado.
 Estos archivos son consumidos por [app/data/loaders.py](app/data/loaders.py):
 
 ```text
-data/dispo_declarada.csv
-data/ofertas.csv
-data/demaCome.csv
-data/agc_asignado.csv
+# Archivos pydataxm (descargados automáticamente por año)
+data/dispo_declarada/dispo_declarada_{year}.csv
+data/ofertas/ofertas_{year}.csv
+data/demaCome/demaCome_{year}.csv
+data/precio_bolsa/precio_bolsa_{year}.csv
+data/dispo_come/dispo_come_{year}.csv
+
+# Archivo AGC por fecha (descargado automáticamente por fecha)
+data/{YYYY-MM-DD}/agc_asignado.csv
+
+# Archivo manual (sin descarga automática)
 data/parametros_plantas.csv
-data/precio_bolsa/precio_bolsa_2024.csv
-data/DispoCome_resource.csv   # requerido para tipos ideal
 ```
 
 ### Archivos auxiliares
@@ -344,8 +349,24 @@ data/preideal_dispatch/{YYYY-MM-DD}.txt
 `app/data/download.py` descarga archivos por fecha hacia `data/{YYYY-MM-DD}/`.
 La CLI invoca `ensure_data_for_date()` cuando necesita datos por fecha.
 
-Los CSVs base todavia dependen principalmente de `notebooks/data_fetcher.ipynb`;
-esa ETL no esta migrada por completo a la aplicacion.
+Los cinco archivos pydataxm (`dispo_declarada`, `ofertas`, `demaCome`, `precio_bolsa` y `dispo_come`)
+se descargan automáticamente por año en `data/{dataset}/{dataset}_{year}.csv` la primera vez
+que se corre una fecha de ese año.
+
+`agc_asignado.csv` se descarga automáticamente por fecha en `data/{YYYY-MM-DD}/agc_asignado.csv`.
+
+Ambos grupos no requieren descarga manual — la CLI genera los archivos bajo demanda.
+
+`PrecOferDesp` (ofertas) se publica por mes calendario completo, un mes despues
+(agosto completo solo esta disponible desde el 1 de septiembre): correr una
+fecha del mes en curso falla con un error explicito, no es un bug.
+Ver issue #30 para una heuristica de fallback para fechas recientes.
+
+`parametros_plantas.csv` sigue siendo mantenido a mano — no hay mecanismo de
+descarga (la fuente real, Paratec, requiere una decision de modelado sobre como
+reducir sus parametros por-unidad/por-configuracion a los escalares planos que
+el modelo usa hoy; ver `docs/superpowers/specs/2026-08-06-ingesta-storage-xm-design.md`
+seccion 7).
 
 ---
 

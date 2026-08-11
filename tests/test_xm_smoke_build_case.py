@@ -57,3 +57,30 @@ def test_cold_start_and_commitment_state(built):
     assert dict(param_data["Ton"]) == {"TERMO1": 5}
     assert param_data["z_on_t0_minus_1"] == {"TERMO1": 1}
     assert param_data["ramp_up"] == {}  # ramps.json={}, RU/RD fall to model default=10000
+
+
+def test_build_case_raises_clear_error_when_ofertas_empty_for_date(tmp_path, monkeypatch):
+    import shutil
+
+    shutil.copytree(DD, tmp_path, dirs_exist_ok=True)
+    # Write a fixture with header + one row outside the dispatch date so dtypes parse correctly
+    (tmp_path / "ofertas" / "ofertas_2024.csv").write_text(
+        "Date,resource_name,Value\n2024-04-15,TERMO1,150\n"
+    )
+    # Create the missing dispo_come partition so ensure_bulk_data_for_year doesn't try to fetch it
+    (tmp_path / "dispo_come").mkdir(exist_ok=True)
+    (tmp_path / "dispo_come" / "dispo_come_2024.csv").write_text("datetime,resource_name,dispo\n")
+    monkeypatch.setattr(
+        "app.data.xm_bulk.ReadDB", lambda: (_ for _ in ()).throw(AssertionError("no network"))
+    )
+    monkeypatch.setattr(
+        "app.data.download.requests.get",
+        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("no network")),
+    )
+
+    fecha = date(2024, 4, 18)
+    case = DispatchCase(dispatch_date=fecha, level=DispatchLevel.preideal)
+    inputs = InputPack(dispatch_date=fecha, source=InputSource.historical, data_dir=str(tmp_path))
+
+    with pytest.raises(ValueError, match="ofertas"):
+        build_case(case, inputs)

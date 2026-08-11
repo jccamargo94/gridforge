@@ -37,29 +37,35 @@ GENERATORS = [
     },
 ]
 
-with open(BASE / "dispo_declarada.csv", "w", newline="") as f:
+(BASE / "dispo_declarada").mkdir(exist_ok=True)
+with open(BASE / "dispo_declarada" / "dispo_declarada_2024.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["datetime", "resource_name", "dispo", "gen_type"])
     for g in GENERATORS:
         for h in HOURS:
             w.writerow([h.isoformat(sep=" "), g["name"], g["dispo_kw"], "TERMICA"])
 
-with open(BASE / "ofertas.csv", "w", newline="") as f:
+(BASE / "ofertas").mkdir(exist_ok=True)
+with open(BASE / "ofertas" / "ofertas_2024.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["Date", "resource_name", "Value"])
     for g in GENERATORS:
         w.writerow([FECHA.isoformat(), g["name"], g["bid_cop_kwh"]])
 
-with open(BASE / "demaCome.csv", "w", newline="") as f:
+(BASE / "demaCome").mkdir(exist_ok=True)
+with open(BASE / "demaCome" / "demaCome_2024.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["datetime", "dema"])
     for h in HOURS:
         w.writerow([h.isoformat(sep=" "), 350_000])
 
-with open(BASE / "agc_asignado.csv", "w", newline="") as f:
+agc_dir = BASE / str(FECHA)
+agc_dir.mkdir(exist_ok=True)
+with open(agc_dir / "agc_asignado.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["datetime", "recurso", "agc"])
-    w.writerow([HOURS[0].isoformat(sep=" "), "TERMO1", 0])
+    for h in HOURS:
+        w.writerow([h.isoformat(sep=" "), "TERMO1", 0])
 
 with open(BASE / "parametros_plantas.csv", "w", newline="") as f:
     w = csv.writer(f)
@@ -73,6 +79,14 @@ with open(BASE / "precio_bolsa" / "precio_bolsa_2024.csv", "w", newline="") as f
     w.writerow(["datetime", "precio_bolsa"])
     for h in HOURS:
         w.writerow([h.isoformat(sep=" "), 200])
+
+(BASE / "dispo_come").mkdir(exist_ok=True)
+with open(BASE / "dispo_come" / "dispo_come_2024.csv", "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["datetime", "resource_name", "dispo"])
+    for g in GENERATORS:
+        for h in HOURS:
+            w.writerow([h.isoformat(sep=" "), g["name"], g["dispo_kw"]])
 
 (BASE / "ramps.json").write_text("{}")
 (BASE / "preideal_dispatch_map.json").write_text("{}")
@@ -92,6 +106,23 @@ for g in GENERATORS:
 
 prid_row = ["TOTAL"] + ["350"] * 24
 (flat_dir / f"PrId{MMDD}_NAL.txt").write_text(",".join(prid_row) + "\n", encoding="latin1")
+
+with open(flat_dir / f"dCondIniP{MMDD}.txt", "w") as f:
+    f.write("Recurso,Tipo,Gpini-1,Conf_Pini-1,T_CONF_Pini-1\n")
+    for g in GENERATORS:
+        f.write(f"{g['name']},T,{g['gpini']},{g['conf']},{g['tconf']}\n")
+
+(flat_dir / f"dCondIniU{MMDD}.txt").write_text("Recurso,Tipo,Gini-1,Cini-1\n")
+
+imar_lines = []
+for g in GENERATORS:
+    imar_lines.append(f"{g['name']},0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+(flat_dir / f"iMAR{MMDD}_NAL.txt").write_text("\n".join(imar_lines) + "\n")
+
+agcu_lines = []
+for g in GENERATORS:
+    agcu_lines.append(f'"{g["name"]}",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0')
+(flat_dir / f"dAGCUNIDAD{MMDD}.txt").write_text("\n".join(agcu_lines) + "\n")
 
 with open(ci_dir / f"dCondIniP{MMDD}.txt", "w") as f:
     f.write("Recurso,Tipo,Gpini-1,Conf_Pini-1,T_CONF_Pini-1\n")

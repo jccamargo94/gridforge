@@ -82,6 +82,18 @@ COP/MWh**, no COP/kWh.
 exactamente el tipo de bug de escala que ya ocurrio una vez en este repo (revenue BESS
 inflado 1000x, Fase 1) — se deja explicito aqui en vez de asumir.
 
+Segunda conversion, independiente de la anterior: `dispo_declarada.csv` (Pmax) esta en
+**kW** (`case_builder.py` hace `dispo["dispo"] * 1e-3` bajo el comentario
+`# Valores en MWh`), mientras que `PrId` (generacion despachada) esta en **MW crudo,
+sin escalar** (`case_builder.py` usa `demand_pronos` directo desde `PrId` sin ningun
+factor — confirmado tambien por el comentario de `agc.py`: *"Values are MW in the raw
+blob"*). La regla "a media maquina" (`0 < despachado < disponible`) compara ambos
+directamente, asi que `dispo_declarada` debe convertirse a MW (`*1e-3`) antes de
+comparar contra `PrId` — si no, `disponible` queda ~1000x mas grande que
+`despachado` siempre, la regla nunca filtra nada, y la heuristica degrada
+silenciosamente a "todo cae al fallback de ultimo precio" sin que ningun test con
+datos autoconsistentes lo note.
+
 ## 2. Arquitectura
 
 Paquete nuevo `app/data/heuristic/` (no un solo archivo — deja espacio para que

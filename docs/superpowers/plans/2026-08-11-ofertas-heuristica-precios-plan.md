@@ -175,9 +175,9 @@ del fixture renombrado — `ensure_data_for_date`/`resolve_input` ya no buscan
 ```bash
 uv run ruff check . && uv run ruff format --check .
 git add app/data/download.py app/data/paths.py tests/test_download.py \
-        tests/test_paths.py tests/fixtures/xm_smoke/generate_fixture.py \
-        tests/fixtures/xm_smoke/2024-04-18/iMAR0418.txt \
-        tests/fixtures/xm_smoke/2024-04-18/iMAR0418_NAL.txt
+        tests/test_paths.py tests/fixtures/xm_smoke/generate_fixture.py
+git add -A tests/fixtures/xm_smoke/2024-04-18/iMAR0418.txt \
+           tests/fixtures/xm_smoke/2024-04-18/iMAR0418_NAL.txt
 git commit -m "fix: iMAR blob filename has no _NAL suffix, only PrId does
 
 Verified live against XM's real blob storage: iMAR{MMDD}.txt has no
@@ -356,6 +356,11 @@ def detect_marginal_resources(
     como candidato de todas las demas horas (solo puede tener un precio,
     porque su oferta es plana durante el dia). Recursos que nunca quedan
     como unico candidato de ninguna hora no se resuelven aqui.
+
+    `despachado`/`disponible` deben venir en la misma unidad (MW) -- ver nota
+    de unidades en `ensure_ofertas_estimado`. Si un recurso es candidato unico
+    en mas de una hora simultaneamente, se resuelve con la primera en orden de
+    hora (0->23); es una eleccion arbitraria pero determinista, no un bug.
     """
     candidates: dict[int, set[str]] = {h: set() for h in _HOURS}
     for resource, despacho in predespacho.items():
@@ -483,14 +488,18 @@ def estimate_ofertas(
     mpo_by_hour: list[float],
     ultimo_precio: dict[str, float],
 ) -> pd.DataFrame:
-    """Fila `ofertas` estimada para `dispatch_date`, un renglon por recurso en
-    `ultimo_precio`. Recursos resueltos como marginales (ver
-    `detect_marginal_resources`) usan el MPO/1e3 de su hora resuelta; el resto
-    usa el ultimo precio publicado sin cambio."""
+    """Fila `ofertas` estimada para `dispatch_date`, un renglon por cada recurso
+    resuelto como marginal (ver `detect_marginal_resources`) o presente en
+    `ultimo_precio` (la union de ambos conjuntos -- un recurso resuelto sin
+    precio historico previo igual recibe fila, usando su MPO inferido; uno sin
+    resolver usa el ultimo precio publicado sin cambio)."""
     resolved = detect_marginal_resources(predespacho, dispo_declarada)
     rows = []
-    for resource, last_value in ultimo_precio.items():
-        value = mpo_by_hour[resolved[resource]] / 1e3 if resource in resolved else last_value
+    for resource in set(ultimo_precio) | set(resolved):
+        if resource in resolved:
+            value = mpo_by_hour[resolved[resource]] / 1e3
+        else:
+            value = ultimo_precio[resource]
         rows.append(
             {
                 "Date": pd.Timestamp(dispatch_date),
@@ -573,11 +582,11 @@ def test_ensure_ofertas_estimado_matches_names_and_caches(tmp_path):
     hours = [pd.Timestamp(fecha) + pd.Timedelta(hours=h) for h in range(24)]
     dispo = pd.DataFrame(
         [
-            {"resource_name": "TERMO1", "datetime": h, "dispo": 300.0, "gen_type": "TERMICA"}
+            {"resource_name": "TERMO1", "datetime": h, "dispo": 300_000.0, "gen_type": "TERMICA"}
             for h in hours
         ]
         + [
-            {"resource_name": "TERMO2", "datetime": h, "dispo": 200.0, "gen_type": "TERMICA"}
+            {"resource_name": "TERMO2", "datetime": h, "dispo": 200_000.0, "gen_type": "TERMICA"}
             for h in hours
         ]
     )
@@ -671,8 +680,14 @@ def ensure_ofertas_estimado(
         if matched is not None:
             predespacho[matched] = values
 
+    # dispo_declarada.csv esta en kW (case_builder.py hace *1e-3 -> MW bajo
+    # "# Valores en MWh"); PrId (predespacho, generacion despachada) esta en MW
+    # crudo, sin escalar (mismo convenio documentado en agc.py). Sin este *1e-3
+    # aqui, "disponible" queda ~1000x mas grande que "despachado" siempre, la
+    # regla "a media maquina" nunca filtra nada, y todo cae al fallback en
+    # silencio -- no lo detectes por un test fallando, detectalo por unidades.
     dispo_declarada = {
-        resource: group.sort_values("datetime")["dispo"].tolist()
+        resource: (group.sort_values("datetime")["dispo"] * 1e-3).tolist()
         for resource, group in dispo.groupby("resource_name")
     }
 

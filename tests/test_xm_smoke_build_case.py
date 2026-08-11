@@ -64,9 +64,16 @@ def test_build_case_raises_clear_error_when_ofertas_empty_for_date(tmp_path, mon
 
     shutil.copytree(DD, tmp_path, dirs_exist_ok=True)
     # Write a fixture with header + one row outside the dispatch date so dtypes parse correctly
+    # (a header-only CSV makes pandas parse Date as `object`, not datetime64,
+    # and crash on `.dt` later -- unrelated to the heuristic, keep a row).
     (tmp_path / "ofertas" / "ofertas_2024.csv").write_text(
         "Date,resource_name,Value\n2024-04-15,TERMO1,150\n"
     )
+    # iMAR presente pero sin fila "MPO" parseable -> la heuristica tampoco
+    # puede estimar, debe terminar en el mismo raise de siempre. (No lo
+    # borramos: ensure_data_for_date reintentaria descargarlo y pisaria el
+    # monkeypatch de "no network" de abajo.)
+    (tmp_path / "2024-04-18" / "iMAR0418.txt").write_text("sin fila MPO valida\n")
     # Create the missing dispo_come partition so ensure_bulk_data_for_year doesn't try to fetch it
     (tmp_path / "dispo_come").mkdir(exist_ok=True)
     (tmp_path / "dispo_come" / "dispo_come_2024.csv").write_text("datetime,resource_name,dispo\n")
@@ -84,3 +91,37 @@ def test_build_case_raises_clear_error_when_ofertas_empty_for_date(tmp_path, mon
 
     with pytest.raises(ValueError, match="ofertas"):
         build_case(case, inputs)
+
+
+def test_build_case_uses_heuristic_when_ofertas_missing_but_historical_data_exists(
+    tmp_path, monkeypatch
+):
+    import shutil
+
+    shutil.copytree(DD, tmp_path, dirs_exist_ok=True)
+    # Sin fila para la fecha del dispatch, pero SI hay precio historico para
+    # ambos generadores -> la heuristica puede al menos usar el fallback.
+    (tmp_path / "ofertas" / "ofertas_2024.csv").write_text(
+        "Date,resource_name,Value\n2024-04-15,TERMO1,150\n2024-04-15,TERMO2,180\n"
+    )
+    (tmp_path / "dispo_come").mkdir(exist_ok=True)
+    (tmp_path / "dispo_come" / "dispo_come_2024.csv").write_text("datetime,resource_name,dispo\n")
+    monkeypatch.setattr(
+        "app.data.xm_bulk.ReadDB", lambda: (_ for _ in ()).throw(AssertionError("no network"))
+    )
+    monkeypatch.setattr(
+        "app.data.download.requests.get",
+        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("no network")),
+    )
+
+    fecha = date(2024, 4, 18)
+    case = DispatchCase(dispatch_date=fecha, level=DispatchLevel.preideal)
+    inputs = InputPack(dispatch_date=fecha, source=InputSource.historical, data_dir=str(tmp_path))
+
+    # No debe lanzar -- la heuristica cubre el hueco.
+    _, param_data, _ = build_case(case, inputs)
+    beta = dict(param_data["beta"])
+    # PrId del fixture usa el nombre "TOTAL" (no matchea TERMO1/TERMO2), asi
+    # que ningun recurso se resuelve como marginal -- ambos caen al fallback
+    # de ultimo precio publicado, escalado x1e3 (COP/kWh -> COP/MWh).
+    assert beta == {"TERMO1": 150000.0, "TERMO2": 180000.0}

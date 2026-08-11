@@ -20,6 +20,7 @@ from thefuzz import fuzz, process
 from app.data import loaders
 from app.data.agc import ensure_agc_asignado
 from app.data.download import ensure_data_for_date
+from app.data.heuristic.biddings import ensure_ofertas_estimado
 from app.data.ofei import parse_ofei
 from app.data.paths import resolve_input
 from app.data.xm_bulk import ensure_bulk_data_for_year
@@ -107,13 +108,17 @@ def build_case(
     oferta_full = ofertas.copy()
     ofertas = ofertas[ofertas.Date.dt.date == DISPATCH_DATE]
     if ofertas.empty:
+        try:
+            ofertas = ensure_ofertas_estimado(DISPATCH_DATE, dd, dispo, oferta_full)
+        except (FileNotFoundError, ValueError):
+            ofertas = pd.DataFrame(columns=["Date", "resource_name", "Value", "is_estimated"])
+    if ofertas.empty:
         raise ValueError(
-            f"no hay ofertas (PrecOferDesp) publicadas por XM para {DISPATCH_DATE}. "
-            "XM publica PrecOferDesp por mes calendario completo, un mes despues "
-            "(agosto completo solo esta disponible desde el 1 de septiembre) -- "
-            "intente con una fecha de un mes ya cerrado, o ver GH issue "
-            "'heuristica de precios de oferta para fechas recientes' para el "
-            "enfoque planeado a futuro."
+            f"no hay ofertas (PrecOferDesp) publicadas por XM para {DISPATCH_DATE}, y "
+            "tampoco se pudo estimar con la heuristica (PrId/iMAR no disponibles, o sin "
+            "precio historico de ningun recurso). XM publica PrecOferDesp por mes "
+            "calendario completo, un mes despues (agosto completo solo esta disponible "
+            "desde el 1 de septiembre) -- intente con una fecha de un mes ya cerrado."
         )
     agc_asignado = agc_asignado[agc_asignado["datetime"].dt.date == DISPATCH_DATE]
     demanda = demanda[demanda["datetime"].dt.date == DISPATCH_DATE]

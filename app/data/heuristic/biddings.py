@@ -13,6 +13,10 @@ import io
 from datetime import date
 
 import pandas as pd
+from thefuzz import fuzz, process
+
+from app.data.paths import resolve_input
+from app.storage import get_storage
 
 _HOURS = range(24)
 
@@ -105,3 +109,78 @@ def estimate_ofertas(
             }
         )
     return pd.DataFrame(rows, columns=["Date", "resource_name", "Value", "is_estimated"])
+
+
+def _match_resource_name(raw_name: str, resource_names: list[str]) -> str | None:
+    match = process.extractOne(
+        query=raw_name.lower(),
+        choices=resource_names,
+        scorer=fuzz.partial_ratio,
+        processor=lambda x: x.lower().replace(" ", ""),
+        score_cutoff=70,
+    )
+    return match[0] if match else None
+
+
+def ensure_ofertas_estimado(
+    dispatch_date: date,
+    data_dir: str,
+    dispo: pd.DataFrame,
+    oferta_full: pd.DataFrame,
+) -> pd.DataFrame:
+    """Estima (y cachea) las filas `ofertas` para `dispatch_date`. `dispo` debe
+    venir ya filtrado a esa fecha. Propaga FileNotFoundError/ValueError si
+    PrId/iMAR no estan disponibles o no se pueden parsear -- el llamador decide
+    que hacer (ver case_builder.py)."""
+    storage = get_storage(data_dir)
+    year = dispatch_date.year
+    cache_path = f"ofertas_estimado/ofertas_estimado_{year}.csv"
+
+    if storage.exists(cache_path):
+        with storage.open(cache_path, "rb") as f:
+            cached = pd.read_csv(f, parse_dates=["Date"])
+        existing = cached[cached["Date"].dt.date == dispatch_date]
+        if not existing.empty:
+            return existing.reset_index(drop=True)
+    else:
+        cached = pd.DataFrame(columns=["Date", "resource_name", "Value", "is_estimated"])
+
+    prid_path = resolve_input("PrId", dispatch_date, data_dir)
+    with open(prid_path, encoding="latin1") as f:
+        predespacho_raw = parse_predespacho(f.read())
+
+    imar_path = resolve_input("iMAR", dispatch_date, data_dir)
+    with open(imar_path, encoding="latin1") as f:
+        mpo_by_hour = parse_mpo(f.read())
+
+    resource_names = list(dispo["resource_name"].unique())
+    predespacho = {}
+    for raw_name, values in predespacho_raw.items():
+        matched = _match_resource_name(raw_name, resource_names)
+        if matched is not None:
+            predespacho[matched] = values
+
+    # dispo_declarada.csv esta en kW (case_builder.py hace *1e-3 -> MW bajo
+    # "# Valores en MWh"); PrId (predespacho, generacion despachada) esta en MW
+    # crudo, sin escalar (mismo convenio documentado en agc.py). Sin este *1e-3
+    # aqui, "disponible" queda ~1000x mas grande que "despachado" siempre, la
+    # regla "a media maquina" nunca filtra nada, y todo cae al fallback en
+    # silencio -- no lo detectes por un test fallando, detectalo por unidades.
+    dispo_declarada = {
+        resource: (group.sort_values("datetime")["dispo"] * 1e-3).tolist()
+        for resource, group in dispo.groupby("resource_name")
+    }
+
+    ultimo_precio = (
+        oferta_full.sort_values("Date").groupby("resource_name")["Value"].last().to_dict()
+    )
+
+    estimated = estimate_ofertas(
+        dispatch_date, predespacho, dispo_declarada, mpo_by_hour, ultimo_precio
+    )
+
+    cached = pd.concat([cached, estimated], ignore_index=True)
+    with storage.open(cache_path, "w") as f:
+        cached.to_csv(f, index=False)
+
+    return estimated

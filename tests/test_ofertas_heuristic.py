@@ -4,6 +4,7 @@ import pandas as pd
 
 from app.data.heuristic.biddings import (
     detect_marginal_resources,
+    ensure_ofertas_estimado,
     estimate_ofertas,
     parse_mpo,
     parse_predespacho,
@@ -134,3 +135,59 @@ def test_estimate_ofertas_resolved_resource_without_history_still_gets_row():
     mpo_by_hour = [1000.0] * 5 + [990000.0] + [1000.0] * 18
     result = estimate_ofertas(_date(2026, 8, 11), predespacho, dispo_declarada, mpo_by_hour, {})
     assert result.set_index("resource_name")["Value"].to_dict() == {"TERMO1": 990.0}
+
+
+def _write_prid_imar(tmp_path, fecha_str="2026-08-11", mmdd="0811"):
+    day_dir = tmp_path / fecha_str
+    day_dir.mkdir(parents=True, exist_ok=True)
+    # Nombres identicos a los del universo dispo (no ambiguos para el fuzzy
+    # match) -- la robustez del match en si con nombres XM reales/ruidosos
+    # queda para iterar despues (issue #35), esto prueba la orquestacion.
+    (day_dir / f"PrId{mmdd}_NAL.txt").write_text(
+        "TERMO1," + ",".join(["0"] * 5 + ["150"] + ["300"] * 18) + "\n"
+        "TERMO2," + ",".join(["200"] * 24) + "\n",
+        encoding="latin1",
+    )
+    mpo_row = ",".join(["1000"] * 5 + ["990000"] + ["1000"] * 18)
+    (day_dir / f"iMAR{mmdd}.txt").write_text(
+        f'"Costo Marginal",{mpo_row}\n"Delta",' + ",".join(["0"] * 24) + f'\n"MPO",{mpo_row}\n',
+        encoding="latin1",
+    )
+    return day_dir
+
+
+def test_ensure_ofertas_estimado_matches_names_and_caches(tmp_path):
+    fecha = _date(2026, 8, 11)
+    _write_prid_imar(tmp_path)
+
+    hours = [pd.Timestamp(fecha) + pd.Timedelta(hours=h) for h in range(24)]
+    dispo = pd.DataFrame(
+        [
+            {"resource_name": "TERMO1", "datetime": h, "dispo": 300_000.0, "gen_type": "TERMICA"}
+            for h in hours
+        ]
+        + [
+            {"resource_name": "TERMO2", "datetime": h, "dispo": 200_000.0, "gen_type": "TERMICA"}
+            for h in hours
+        ]
+    )
+    oferta_full = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-07-30"), pd.Timestamp("2026-07-30")],
+            "resource_name": ["TERMO1", "TERMO2"],
+            "Value": [100.0, 180.0],
+        }
+    )
+
+    result = ensure_ofertas_estimado(fecha, str(tmp_path), dispo, oferta_full)
+
+    values = result.set_index("resource_name")["Value"].to_dict()
+    assert values["TERMO1"] == 990.0  # resuelto hora 5 (990000 MPO / 1e3)
+    assert values["TERMO2"] == 180.0  # nunca a media maquina -> fallback ultimo precio
+
+    # Cachea: una segunda llamada no vuelve a leer PrId/iMAR (los borramos y
+    # confirmamos que igual funciona, porque debe venir del cache).
+    (tmp_path / "2026-08-11" / "PrId0811_NAL.txt").unlink()
+    (tmp_path / "2026-08-11" / "iMAR0811.txt").unlink()
+    cached_result = ensure_ofertas_estimado(fecha, str(tmp_path), dispo, oferta_full)
+    assert cached_result.set_index("resource_name")["Value"].to_dict() == values

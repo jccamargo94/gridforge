@@ -46,7 +46,7 @@ def run_case(
                 pd.DataFrame([metrics]).to_csv(metrics_path, index=False)
                 result.metrics = metrics
                 result.metrics_path = metrics_path
-            except FileNotFoundError:
+            except (FileNotFoundError, ValueError):
                 print(f"  ! no XM actuals for {case.dispatch_date}; skipping metrics")
 
         return result

@@ -4,10 +4,14 @@ from app.data.actuals import load_actual_dispatch, load_actual_price
 
 
 def test_load_actual_price(tmp_path):
-    (tmp_path / "preideal_price").mkdir()
-    # one label column + 24 hourly prices
-    row = "MPO," + ",".join(str(float(i)) for i in range(24))
-    (tmp_path / "preideal_price" / "2024-04-18.txt").write_text(row + "\n")
+    (tmp_path / "2024-04-18").mkdir()
+    # full 3-row iMAR format; load_actual_price reads the "MPO" row (24 values)
+    mpo = ",".join(str(float(i)) for i in range(24))
+    (tmp_path / "2024-04-18" / "iMAR0418.txt").write_text(
+        '"Costo Marginal",' + mpo + "\n"
+        '"Delta",' + ",".join("0.0" for _ in range(24)) + "\n"
+        '"MPO",' + mpo + "\n"
+    )
     vals = load_actual_price(date(2024, 4, 18), data_dir=str(tmp_path))
     assert len(vals) == 24
     assert vals[0] == 0.0 and vals[23] == 23.0

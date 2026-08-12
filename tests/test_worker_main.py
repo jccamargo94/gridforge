@@ -53,18 +53,19 @@ def test_process_once_solves_pending_run_end_to_end(tmp_path, monkeypatch):
     assert Path(updated.price_path).exists()
     assert Path(updated.out_dir) == Path(results_root) / run.id
 
-    # xm_smoke fixture has no preideal_price actuals -> evaluate is skipped,
-    # matching tests/test_xm_smoke_run.py's own assertion
-    assert queries.get_metric_set(session, run.id) is None
+    # xm_smoke fixture has an iMAR actuals file (MPO=150000.00) -> metrics compute
+    assert queries.get_metric_set(session, run.id) is not None
 
     # new assertions
     assert updated.log_path is not None
     log_file = Path(updated.log_path)
     assert log_file.exists()
-    # xm_smoke fixture has no preideal_price actuals, so run_case's
-    # "no XM actuals" branch (app/pipeline/runner.py:48) fires and prints —
-    # proof the log actually captured run_case's stdout, not an empty file.
-    assert "no XM actuals" in log_file.read_text()
+    # Proof the log actually captured run_case's stdout (not an empty file):
+    # ensure_data_for_date prints this line when the fixture files already
+    # exist, so it deterministically flows through the captured stream. The
+    # cbc dual-suffix warning does NOT reach the log (it goes through pyomo's
+    # logging handler, not stdout), so it can't be used as the marker here.
+    assert "Skipping download" in log_file.read_text()
 
 
 def test_process_once_marks_run_failed_when_run_case_reports_failure(tmp_path, monkeypatch):

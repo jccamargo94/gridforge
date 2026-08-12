@@ -301,10 +301,14 @@ def build_case(
     gen_on = initial_condition_df[initial_condition_df["Gpini-1"] != 0]["Recurso"].unique()
     needed_generators = [gen for gen in list(gen_on) if gen not in ofertas.resource_name.unique()]
     for gen in needed_generators:
+        # Ultimo precio publicado: sort ascendente por Date + tail(1) toma la
+        # fila mas reciente (misma convencion que ensure_ofertas_estimado);
+        # .head(1) sobre frame sin ordenar no garantiza nada y head(1) tras
+        # sort ascendente tomaba la mas antigua.
         gen_oferta = (
             oferta_full.query("resource_name == @gen")
             .sort_values("Date")
-            .head(1)
+            .tail(1)
             .reset_index(drop=True)
         )
         gen_oferta.loc[0, "Date"] = pd.Timestamp(DISPATCH_DATE)

@@ -13,6 +13,7 @@ from datetime import date
 import pandas as pd
 from pydataxm.pydataxm import ReadDB
 
+from app.data.crosswalk import fetch_resource_crosswalk
 from app.db.queries import upsert_input_dataset
 from app.storage import get_storage
 
@@ -27,20 +28,6 @@ def _melt_hourly(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
     hour_num = long["hour"].str.removeprefix(HOUR_PREFIX).astype(int) - 1
     long["datetime"] = pd.to_datetime(long["Date"]) + pd.to_timedelta(hour_num, unit="h")
     return long.rename(columns={"Values_code": "code"})[["code", "datetime", value_col]]
-
-
-def fetch_resource_crosswalk(consult) -> pd.DataFrame:
-    """code <-> resource_name <-> gen_type, from XM's ListadoRecursos list metric.
-
-    start/end are required by pydataxm's request_data even for list-type
-    metrics (it computes a date range unconditionally before branching on
-    entity type) but are otherwise unused -- any single date works.
-    """
-    today = date.today()
-    raw = consult.request_data("ListadoRecursos", "Sistema", today, today)
-    return raw.rename(
-        columns={"Values_Code": "code", "Values_Name": "resource_name", "Values_Type": "gen_type"}
-    )[["code", "resource_name", "gen_type"]]
 
 
 def ensure_dispo_declarada(

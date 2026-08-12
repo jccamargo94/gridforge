@@ -301,7 +301,16 @@ def build_case(
     gen_on = initial_condition_df[initial_condition_df["Gpini-1"] != 0]["Recurso"].unique()
     needed_generators = [gen for gen in list(gen_on) if gen not in ofertas.resource_name.unique()]
     for gen in needed_generators:
-        gen_oferta = oferta_full.query("resource_name == @gen").head(1).reset_index(drop=True)
+        # Ultimo precio publicado: sort ascendente por Date + tail(1) toma la
+        # fila mas reciente (misma convencion que ensure_ofertas_estimado);
+        # .head(1) sobre frame sin ordenar no garantiza nada y head(1) tras
+        # sort ascendente tomaba la mas antigua.
+        gen_oferta = (
+            oferta_full.query("resource_name == @gen")
+            .sort_values("Date")
+            .tail(1)
+            .reset_index(drop=True)
+        )
         gen_oferta.loc[0, "Date"] = pd.Timestamp(DISPATCH_DATE)
         ofertas = pd.concat([ofertas, gen_oferta], axis=0)
 
@@ -331,11 +340,14 @@ def build_case(
     minimo_operativo["resource"] = minimo_operativo["resource"].apply(lambda x: MO_map.get(x, x))
 
     if precio_arranque.empty:
-        # See issue #38: XM's live OFEI no longer publishes PAP records (0 in a real
-        # 2026 file vs 678 in a real 2024 one) -- cold_start silently defaults to 0
-        # for every fuel generator (pyomo Param default) until #38 is resolved.
+        # See issue #38: OFEI for in-progress months has no PAP records (same
+        # month-calendar lag as PrecOferDesp -- verified: 0 PAP in a real
+        # 2026-08-02 file vs 678 in real closed 2024-04-18/2026-05-15 files).
+        # cold_start silently defaults to 0 for every fuel generator (pyomo
+        # Param default) until the month closes and XM republishes.
         print(
-            "...OFEI no tiene registros PAP para esta fecha (ver issue #38): "
+            "...OFEI no trae registros PAP para esta fecha (mes en curso, mismo "
+            "rezago de mes calendario que PrecOferDesp; ver issue #38): "
             "cold_start quedara en 0 para todos los generadores termicos."
         )
 
@@ -360,9 +372,13 @@ def build_case(
                 print(f"...no se pudo mapear precio de arranque (PAP) para {gen}. Se ignora.")
             continue
         gen_name_mapped = generators_pap_map[gen]
+        # Arranque en frio = tipo PAPF (fria); PAPC es caliente y PAPT tibia. El
+        # Param cold_start es costo fijo por arranque en COP (se suma directo en
+        # la funcion objetivo, ver model.py) -- el PAP en COP se usa SIN escalar.
+        # Legacy app/model/load_data.py aplicaba *1e-3 por error (codigo muerto).
         gen_pap = precio_arranque[
             (precio_arranque["resource"] == gen_name_mapped)
-            & (precio_arranque.type.str.contains("C"))
+            & (precio_arranque.type.str.contains("F"))
         ]["price"].values[0]
         cold_start[gen] = float(gen_pap)
 

@@ -46,7 +46,8 @@ def test_ofei_parses():
     ofei_path = resolve_input("OFEI", FECHA, DD)
     ofei = parse_ofei(ofei_path, FECHA)
     assert set(ofei.precio_arranque["resource"]) == {"TERMO1", "TERMO2"}
-    assert all(ofei.precio_arranque["type"].str.contains("C"))
+    # Real XM PAP schema (issue #38): fria/tibia/caliente = PAPF02/PAPT02/PAPC02
+    assert set(ofei.precio_arranque["type"].str.strip()) == {"PAPF02", "PAPT02", "PAPC02"}
     assert set(ofei.minimo_operativo["resource"]) == {"TERMO1", "TERMO2"}
     assert ofei.cc == {}
 

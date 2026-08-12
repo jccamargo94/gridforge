@@ -17,10 +17,10 @@ def test_evaluate_saved_run_writes_metrics_csv(tmp_path):
     )
     price_df.to_csv(tmp_path / "marginal_price-2024-04-18-preideal.csv", index=False)
 
-    actuals_dir = tmp_path / "preideal_price"
+    actuals_dir = tmp_path / "2024-04-18"
     actuals_dir.mkdir()
     row = "MPO," + ",".join(str(float(i)) for i in range(24))
-    (actuals_dir / "2024-04-18.txt").write_text(row + "\n")
+    (actuals_dir / "iMAR0418.txt").write_text(row + "\n")
 
     metrics = evaluate_saved_run(
         date(2024, 4, 18), DispatchLevel.preideal, out=str(tmp_path), data_dir=str(tmp_path)
@@ -48,10 +48,10 @@ def test_evaluate_sorts_price_csv_by_datetime(tmp_path):
         ]
     ).to_csv(tmp_path / "marginal_price-2024-04-18-preideal.csv", index=False)
 
-    actuals_dir = tmp_path / "preideal_price"
+    actuals_dir = tmp_path / "2024-04-18"
     actuals_dir.mkdir()
     vals = [10.0, 90.0] + [0.0] * 22
-    (actuals_dir / "2024-04-18.txt").write_text("MPO," + ",".join(str(v) for v in vals) + "\n")
+    (actuals_dir / "iMAR0418.txt").write_text("MPO," + ",".join(str(v) for v in vals) + "\n")
 
     metrics = evaluate_saved_run(
         date(2024, 4, 18), DispatchLevel.preideal, out=str(tmp_path), data_dir=str(tmp_path)
@@ -94,10 +94,10 @@ def test_evaluate_matches_inline_eval_exactly(monkeypatch, tmp_path):
 
     monkeypatch.setattr(runner, "build_case", fake_build)
 
-    actuals_dir = tmp_path / "preideal_price"
+    actuals_dir = tmp_path / "2024-04-18"
     actuals_dir.mkdir()
     row = "MPO," + ",".join(str(float(i)) for i in range(24))
-    (actuals_dir / "2024-04-18.txt").write_text(row + "\n")
+    (actuals_dir / "iMAR0418.txt").write_text(row + "\n")
 
     case = DispatchCase(dispatch_date=date(2024, 4, 18), level=DispatchLevel.preideal, solver="cbc")
     inline_result = runner.run_case(case, evaluate=True, out=str(tmp_path), data_dir=str(tmp_path))
@@ -122,10 +122,10 @@ def test_evaluate_saved_run_upserts_metrics_summary_csv(tmp_path):
     )
     price_df.to_csv(tmp_path / "marginal_price-2024-04-18-preideal.csv", index=False)
 
-    actuals_dir = tmp_path / "preideal_price"
+    actuals_dir = tmp_path / "2024-04-18"
     actuals_dir.mkdir()
     row = "MPO," + ",".join(str(float(i)) for i in range(24))
-    (actuals_dir / "2024-04-18.txt").write_text(row + "\n")
+    (actuals_dir / "iMAR0418.txt").write_text(row + "\n")
 
     # pre-existing row for a different date must survive the upsert
     pd.DataFrame(
@@ -155,10 +155,10 @@ def test_evaluate_saved_run_replaces_stale_row_for_same_key(tmp_path):
     )
     price_df.to_csv(tmp_path / "marginal_price-2024-04-18-preideal.csv", index=False)
 
-    actuals_dir = tmp_path / "preideal_price"
+    actuals_dir = tmp_path / "2024-04-18"
     actuals_dir.mkdir()
     row = "MPO," + ",".join(str(float(i)) for i in range(24))
-    (actuals_dir / "2024-04-18.txt").write_text(row + "\n")
+    (actuals_dir / "iMAR0418.txt").write_text(row + "\n")
 
     # stale row for the SAME key must be replaced, not duplicated
     pd.DataFrame(

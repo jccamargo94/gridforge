@@ -5,7 +5,7 @@ vi.mock("./supabase", () => ({
 }));
 
 import { supabase } from "./supabase";
-import { createRun, createScenario, downloadRunArtifact, getRunDispatch, getRunLog, listRuns } from "./api-client";
+import { createRun, createScenario, downloadRunArtifact, getRunDispatch, getRunLog, getRunMarginalPlants, listRuns } from "./api-client";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -133,6 +133,27 @@ describe("api-client", () => {
     fetchMock.mockResolvedValue({ ok: false, status: 404, statusText: "Not Found" });
 
     await expect(downloadRunArtifact("run-1", "bess")).rejects.toThrow("404");
+  });
+
+  it("getRunMarginalPlants fetches the marginal plants endpoint as JSON rows", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { datetime: "2024-04-18 00:00:00", generador: "TERMO1", dispatch: 300, pmax: 400, is_marginal: true },
+      ],
+    });
+
+    const rows = await getRunMarginalPlants("run-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/runs/run-1/marginal_plants"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer tok-123" }),
+      })
+    );
+    expect(rows).toEqual([
+      { datetime: "2024-04-18 00:00:00", generador: "TERMO1", dispatch: 300, pmax: 400, is_marginal: true },
+    ]);
   });
 
   it("getRunLog returns the text body on success", async () => {

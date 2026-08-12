@@ -22,8 +22,9 @@ GENERATORS = [
         "pap_cop": 1_500_000,
         "mo": 10,
         "gpini": 150,
-        "conf": "CONF1",
-        "tconf": 5,
+        "conf": 1,
+        "tl": 5,
+        "tfl": 0,
     },
     {
         "name": "TERMO2",
@@ -32,34 +33,41 @@ GENERATORS = [
         "pap_cop": 1_500_000,
         "mo": 5,
         "gpini": 0,
-        "conf": "CONF0",
-        "tconf": 0,
+        "conf": 0,
+        "tl": 0,
+        "tfl": 10,
     },
 ]
 
-with open(BASE / "dispo_declarada.csv", "w", newline="") as f:
+(BASE / "dispo_declarada").mkdir(exist_ok=True)
+with open(BASE / "dispo_declarada" / "dispo_declarada_2024.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["datetime", "resource_name", "dispo", "gen_type"])
     for g in GENERATORS:
         for h in HOURS:
             w.writerow([h.isoformat(sep=" "), g["name"], g["dispo_kw"], "TERMICA"])
 
-with open(BASE / "ofertas.csv", "w", newline="") as f:
+(BASE / "ofertas").mkdir(exist_ok=True)
+with open(BASE / "ofertas" / "ofertas_2024.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["Date", "resource_name", "Value"])
     for g in GENERATORS:
         w.writerow([FECHA.isoformat(), g["name"], g["bid_cop_kwh"]])
 
-with open(BASE / "demaCome.csv", "w", newline="") as f:
+(BASE / "demaCome").mkdir(exist_ok=True)
+with open(BASE / "demaCome" / "demaCome_2024.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["datetime", "dema"])
     for h in HOURS:
         w.writerow([h.isoformat(sep=" "), 350_000])
 
-with open(BASE / "agc_asignado.csv", "w", newline="") as f:
+agc_dir = BASE / str(FECHA)
+agc_dir.mkdir(exist_ok=True)
+with open(agc_dir / "agc_asignado.csv", "w", newline="") as f:
     w = csv.writer(f)
     w.writerow(["datetime", "recurso", "agc"])
-    w.writerow([HOURS[0].isoformat(sep=" "), "TERMO1", 0])
+    for h in HOURS:
+        w.writerow([h.isoformat(sep=" "), "TERMO1", 0])
 
 with open(BASE / "parametros_plantas.csv", "w", newline="") as f:
     w = csv.writer(f)
@@ -74,6 +82,14 @@ with open(BASE / "precio_bolsa" / "precio_bolsa_2024.csv", "w", newline="") as f
     for h in HOURS:
         w.writerow([h.isoformat(sep=" "), 200])
 
+(BASE / "dispo_come").mkdir(exist_ok=True)
+with open(BASE / "dispo_come" / "dispo_come_2024.csv", "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["datetime", "resource_name", "dispo"])
+    for g in GENERATORS:
+        for h in HOURS:
+            w.writerow([h.isoformat(sep=" "), g["name"], g["dispo_kw"]])
+
 (BASE / "ramps.json").write_text("{}")
 (BASE / "preideal_dispatch_map.json").write_text("{}")
 
@@ -84,7 +100,11 @@ ci_dir.mkdir(parents=True, exist_ok=True)
 
 ofei_lines = []
 for g in GENERATORS:
-    ofei_lines.append(f"{g['name']},C PAPC,{g['pap_cop']}")
+    # Real XM PAP schema (issue #38): tres tipos por recurso, fria/tibia/caliente
+    # (PAPF02/PAPT02/PAPC02), precios en COP. cold_start selecciona el tipo frio.
+    ofei_lines.append(f"{g['name']}, PAPF02,{g['pap_cop']}")
+    ofei_lines.append(f"{g['name']}, PAPT02,{int(g['pap_cop'] * 0.8)}")
+    ofei_lines.append(f"{g['name']}, PAPC02,{int(g['pap_cop'] * 0.6)}")
 for g in GENERATORS:
     mo_vals = ",".join(str(g["mo"]) for _ in range(24))
     ofei_lines.append(f"{g['name']}, MO,{mo_vals}")
@@ -93,10 +113,43 @@ for g in GENERATORS:
 prid_row = ["TOTAL"] + ["350"] * 24
 (flat_dir / f"PrId{MMDD}_NAL.txt").write_text(",".join(prid_row) + "\n", encoding="latin1")
 
-with open(ci_dir / f"dCondIniP{MMDD}.txt", "w") as f:
-    f.write("Recurso,Tipo,Gpini-1,Conf_Pini-1,T_CONF_Pini-1\n")
+# Real XM schema (issue #34) -- Planta/ESTADOPINI1/GPPINI_1/CONFPINI1/TL/TFL, not the
+# Recurso/Tipo/Gpini-1/Conf_Pini-1/T_CONF_Pini-1 layout this fixture used to assume.
+DCONDINIP_HEADER = (
+    "Planta ,AGC, BLOQUESPINI1, CONFENTRADA, CONFPINI1, CONFSALIDA, DISPPINI1, "
+    "ESTADOPINI1, GPPINI_1, GPPINI_2, NARRANQUESPINI1, PRUEBAS, TAPUBLICAR, "
+    "TCEPENDIENTE, TDISPPINI1, TFL, TL, TULT\n"
+)
+
+
+def dcondinip_row(g: dict) -> str:
+    return (
+        f"{g['name']}, 0, 0, 0, {g['conf']}, 0, {g['gpini']},  - , "
+        f"{g['gpini']:.4f}, {g['gpini']:.4f}, 0, 0, 10, 0, {g['tl']}, {g['tfl']}, {g['tl']}, 0\n"
+    )
+
+
+with open(flat_dir / f"dCondIniP{MMDD}.txt", "w") as f:
+    f.write(DCONDINIP_HEADER)
     for g in GENERATORS:
-        f.write(f"{g['name']},T,{g['gpini']},{g['conf']},{g['tconf']}\n")
+        f.write(dcondinip_row(g))
+
+(flat_dir / f"dCondIniU{MMDD}.txt").write_text("Recurso,Tipo,Gini-1,Cini-1\n")
+
+mpo_row = ",".join(["150000.00"] * 24)
+delta_row = ",".join(["0.00"] * 24)
+imar_lines = [f'"Costo Marginal",{mpo_row}', f'"Delta",{delta_row}', f'"MPO",{mpo_row}']
+(flat_dir / f"iMAR{MMDD}.txt").write_text("\n".join(imar_lines) + "\n")
+
+agcu_lines = []
+for g in GENERATORS:
+    agcu_lines.append(f'"{g["name"]}",0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0')
+(flat_dir / f"dAGCUNIDAD{MMDD}.txt").write_text("\n".join(agcu_lines) + "\n")
+
+with open(ci_dir / f"dCondIniP{MMDD}.txt", "w") as f:
+    f.write(DCONDINIP_HEADER)
+    for g in GENERATORS:
+        f.write(dcondinip_row(g))
 
 (ci_dir / f"dCondIniU{MMDD}.txt").write_text("Recurso,Tipo,Gini-1,Cini-1\n")
 

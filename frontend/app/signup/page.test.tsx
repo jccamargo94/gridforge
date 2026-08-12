@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import SignupPage from "./page";
 
 const push = vi.fn();
@@ -11,15 +12,41 @@ vi.mock("@/lib/supabase", () => ({
 
 import { supabase } from "@/lib/supabase";
 
+function renderSignup() {
+  return render(
+    <I18nProvider>
+      <SignupPage />
+    </I18nProvider>
+  );
+}
+
 describe("SignupPage", () => {
+  beforeEach(() => vi.clearAllMocks());
   it("signs up and redirects to /login on success", async () => {
     vi.mocked(supabase.auth.signUp).mockResolvedValue({ error: null } as never);
 
-    render(<SignupPage />);
+    renderSignup();
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
-    fireEvent.change(screen.getByLabelText(/contrase/i), { target: { value: "secret123" } });
+    fireEvent.change(screen.getByLabelText("Contrasena"), { target: { value: "secret123" } });
+    fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith("/login"));
+  });
+
+  it("shows an error when the passwords do not match", async () => {
+    renderSignup();
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
+    fireEvent.change(screen.getByLabelText("Contrasena"), { target: { value: "secret123" } });
+    fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "different" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear cuenta/i }));
+
+    await waitFor(() => screen.getByText(/no coinciden/i));
+    expect(supabase.auth.signUp).not.toHaveBeenCalled();
+  });
+
+  it("links to /login", () => {
+    renderSignup();
+    expect(screen.getByRole("link", { name: /iniciar sesion/i })).toHaveAttribute("href", "/login");
   });
 });

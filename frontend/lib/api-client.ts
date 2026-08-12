@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, RunDetail, RunSummary, Scenario } from "./types";
+import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, RunDetail, RunSummary, Scenario } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -48,9 +48,13 @@ export function getRunDispatch(id: string): Promise<DispatchRow[]> {
   return request<DispatchRow[]>(`/runs/${id}/dispatch`);
 }
 
+export function getRunMarginalPlants(id: string): Promise<MarginalPlant[]> {
+  return request<MarginalPlant[]>(`/runs/${id}/marginal_plants`);
+}
+
 export async function downloadRunArtifact(
   id: string,
-  artifact: "dispatch" | "prices" | "bess"
+  artifact: "dispatch" | "prices" | "bess" | "marginal_plants" | "price_comparison"
 ): Promise<Blob> {
   const headers = await authHeader();
   const resp = await fetch(`${API_BASE_URL}/runs/${id}/download/${artifact}`, { headers });

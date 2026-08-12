@@ -12,4 +12,5 @@ class RunResult(BaseModel):
     bess_summary: dict[str, float] | None = None
     metrics_path: str | None = None
     metrics: dict[str, float] | None = None
+    marginal_plants_path: str | None = None
     error: str | None = None

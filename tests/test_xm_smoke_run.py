@@ -1,6 +1,6 @@
 """Layer-3 check: the fixture survives a real cbc solve via run_case, with
-no XM actuals file and no network access — the two conditions a Docker
-smoke test (Fase 2C) will also run under."""
+the synthetic iMAR actuals file and no network access — the two conditions a
+Docker smoke test (Fase 2C) will also run under."""
 
 from datetime import date
 from pathlib import Path
@@ -26,8 +26,10 @@ def test_run_case_solves_with_no_network_and_no_actuals(tmp_path, monkeypatch):
 
     assert result.ok, result.error
     assert result.error is None
-    # no preideal_price/ fixture file exists -> metrics silently skipped, not a failure
-    assert result.metrics is None
+    # fixture has 2024-04-18/iMAR0418.txt (MPO=150000.00) -> metrics compute:
+    # model MPO=180000 vs "actual" 150000 -> mae = 30000.0
+    assert result.metrics is not None
+    assert result.metrics["mae"] == 30000.0
 
     price = pd.read_csv(result.price_path)
     assert len(price) == 24

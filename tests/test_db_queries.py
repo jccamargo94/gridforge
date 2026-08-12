@@ -1,10 +1,12 @@
 from datetime import date
 
+import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import queries
-from app.db.models import Base
+from app.db.models import Base, Run
 from app.schemas import (
     BessMode,
     BessScenario,
@@ -176,3 +178,81 @@ def test_finish_run_failed_sets_error():
     updated = queries.get_run(session, run.id)
     assert updated.status == "failed"
     assert updated.error == "boom"
+
+
+def test_finish_run_failed_recovers_aborted_transaction():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    # Leave the session in a broken, rollback-required state -- the SQLAlchemy
+    # analogue of Postgres's "current transaction is aborted"
+    # (InFailedSqlTransaction) that a DB error inside run_case produces. A plain
+    # `session.execute(text("SELECT * FROM no_such_table"))` does NOT reproduce
+    # this on SQLite: its driver keeps the transaction usable after a statement
+    # error, so such a test would pass even without the rollback fix. A failed
+    # flush does reproduce it, raising PendingRollbackError on any later commit.
+    session.add(Run())
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+    queries.finish_run_failed(session, run, "boom")
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "failed"
+    assert updated.error == "boom"
+
+
+def test_upsert_input_dataset_creates_new_row():
+    session = _session()
+    row = queries.upsert_input_dataset(
+        session,
+        dataset="precio_bolsa",
+        partition_key="2024",
+        source="pydataxm:PrecBolsNaci",
+        row_count=8784,
+    )
+    assert row.id
+    assert row.fetched_at is not None
+    assert row.row_count == 8784
+
+
+def test_upsert_input_dataset_updates_existing_row_in_place():
+    session = _session()
+    first = queries.upsert_input_dataset(
+        session,
+        dataset="precio_bolsa",
+        partition_key="2024",
+        source="pydataxm:PrecBolsNaci",
+        row_count=8784,
+    )
+    second = queries.upsert_input_dataset(
+        session,
+        dataset="precio_bolsa",
+        partition_key="2024",
+        source="pydataxm:PrecBolsNaci",
+        row_count=8785,
+    )
+    assert second.id == first.id
+    assert second.row_count == 8785
+
+
+def test_get_input_dataset_returns_none_when_missing():
+    session = _session()
+    assert queries.get_input_dataset(session, "precio_bolsa", "2024") is None
+
+
+def test_get_input_dataset_returns_row_when_present():
+    session = _session()
+    queries.upsert_input_dataset(
+        session, dataset="demaCome", partition_key="2024", source="pydataxm:DemaCome"
+    )
+    found = queries.get_input_dataset(session, "demaCome", "2024")
+    assert found is not None
+    assert found.source == "pydataxm:DemaCome"

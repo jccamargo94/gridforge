@@ -20,10 +20,26 @@ export interface RunMetrics {
   wape: number | null;
   smape: number | null;
   r2: number | null;
+  dispatch_mae_mw: number | null;
+  dispatch_rmse_mw: number | null;
   bess_charge_mwh: number | null;
   bess_discharge_mwh: number | null;
   bess_avg_soc_mwh: number | null;
   bess_net_revenue: number | null;
+}
+
+export interface PricePoint {
+  datetime: string;
+  model_mpo: number;
+  xm_mpo: number;
+}
+
+export interface MarginalPlant {
+  datetime: string;
+  generador: string;
+  dispatch: number;
+  pmax: number;
+  is_marginal: boolean;
 }
 
 export interface DispatchRow {
@@ -36,11 +52,13 @@ export interface RunArtifacts {
   dispatch: boolean;
   prices: boolean;
   bess: boolean;
+  marginal_plants: boolean;
 }
 
 export interface RunDetail extends RunSummary {
   metrics: RunMetrics | null;
   artifacts: RunArtifacts;
+  price_series: PricePoint[] | null;
 }
 
 export type BessMode = "arbitrage" | "grid_asset" | "generator";

@@ -90,7 +90,12 @@ def test_get_run_artifacts_all_false_before_worker_runs(api_client):
 
     resp = api_client.get(f"/runs/{run_id}")
     assert resp.status_code == 200
-    assert resp.json()["artifacts"] == {"dispatch": False, "prices": False, "bess": False}
+    assert resp.json()["artifacts"] == {
+        "dispatch": False,
+        "prices": False,
+        "bess": False,
+        "marginal_plants": False,
+    }
 
 
 def test_get_run_artifacts_reflects_available_paths(api_client, tmp_path):
@@ -117,4 +122,9 @@ def test_get_run_artifacts_reflects_available_paths(api_client, tmp_path):
     session.close()
 
     resp = api_client.get(f"/runs/{run_id}")
-    assert resp.json()["artifacts"] == {"dispatch": True, "prices": True, "bess": False}
+    assert resp.json()["artifacts"] == {
+        "dispatch": True,
+        "prices": True,
+        "bess": False,
+        "marginal_plants": False,
+    }

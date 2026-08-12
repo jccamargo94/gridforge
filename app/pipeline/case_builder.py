@@ -15,15 +15,20 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+from sqlalchemy.orm import Session
 from thefuzz import fuzz, process
 
 from app.data import loaders
+from app.data.agc import ensure_agc_asignado
 from app.data.download import ensure_data_for_date
+from app.data.heuristic.biddings import ensure_ofertas_estimado
 from app.data.ofei import parse_ofei
 from app.data.paths import resolve_input
+from app.data.xm_bulk import ensure_bulk_data_for_year
 from app.schemas.bess import BessScenario
 from app.schemas.case import DispatchCase, DispatchLevel
 from app.schemas.input_pack import InputPack
+from app.storage import get_storage
 
 
 def bess_scenario_to_params(scenario: BessScenario) -> tuple[list[str], dict]:
@@ -61,28 +66,35 @@ def build_case(
     inputs: InputPack,
     *,
     ders: int | None = None,
+    session: Session | None = None,
 ) -> tuple[dict, dict, dict]:
     """Return (set_data, param_data, meta) for `UnitCommitmentModel`.
 
     meta keys: timestamps, precio_bolsa, CC, initial_condition_df,
     major_generators, generators, fixed_fuel_fire, pmax_new_resources,
     expansion_sources.
+
+    If *session* is provided (DB-backed worker path), the ensure_* functions
+    record each fetched dataset in the ``input_datasets`` manifest table so
+    provenance is tracked.  The CLI path passes ``None``.
     """
     DISPATCH_DATE = case.dispatch_date
     DERS = ders
     dd = inputs.data_dir
+    storage = get_storage(dd)
 
     ensure_data_for_date(DISPATCH_DATE, data_dir=dd)
+    ensure_bulk_data_for_year(DISPATCH_DATE.year, data_dir=dd, session=session)
 
     # --- Load root CSVs ---
+    year = DISPATCH_DATE.year
     if case.level == DispatchLevel.ideal:
-        dispo_come = loaders.load_dispo_come(dd)
-    dispo = loaders.load_dispo(dd)
-    ofertas = loaders.load_ofertas(dd)
-    demanda = loaders.load_demanda(dd)
-    agc_asignado = loaders.load_agc(dd)
+        dispo_come = loaders.load_dispo_come(dd, year)
+    dispo = loaders.load_dispo(dd, year)
+    ofertas = loaders.load_ofertas(dd, year)
+    demanda = loaders.load_demanda(dd, year)
     parametros_plantas = loaders.load_parametros_plantas(dd)
-    precio_bolsa = loaders.load_precio_bolsa(dd)
+    precio_bolsa = loaders.load_precio_bolsa(dd, year)
 
     # --- Parse OFEI ---
     ofei_path = resolve_input("OFEI", DISPATCH_DATE, dd)
@@ -97,18 +109,62 @@ def build_case(
     # --- Filter data by date ---
     dispo = dispo[(dispo.datetime.dt.date == DISPATCH_DATE) & (dispo["resource_name"].notnull())]
     dispo = dispo.drop_duplicates(subset=["resource_name", "datetime"])
+    ensure_agc_asignado(
+        DISPATCH_DATE,
+        dd,
+        resource_names=list(dispo["resource_name"].unique()),
+        session=session,
+    )
+    agc_asignado = loaders.load_agc(dd, DISPATCH_DATE)
     oferta_full = ofertas.copy()
     ofertas = ofertas[ofertas.Date.dt.date == DISPATCH_DATE]
+    if ofertas.empty:
+        try:
+            ofertas = ensure_ofertas_estimado(DISPATCH_DATE, dd, dispo, oferta_full)
+        except (FileNotFoundError, ValueError):
+            ofertas = pd.DataFrame(columns=["Date", "resource_name", "Value", "is_estimated"])
+    if ofertas.empty:
+        raise ValueError(
+            f"no hay ofertas (PrecOferDesp) publicadas por XM para {DISPATCH_DATE}, y "
+            "tampoco se pudo estimar con la heuristica (PrId/iMAR no disponibles, o sin "
+            "precio historico de ningun recurso). XM publica PrecOferDesp por mes "
+            "calendario completo, un mes despues (agosto completo solo esta disponible "
+            "desde el 1 de septiembre) -- intente con una fecha de un mes ya cerrado."
+        )
     agc_asignado = agc_asignado[agc_asignado["datetime"].dt.date == DISPATCH_DATE]
     demanda = demanda[demanda["datetime"].dt.date == DISPATCH_DATE]
     precio_bolsa = precio_bolsa[precio_bolsa["datetime"].dt.date == DISPATCH_DATE]
+
+    # ideal depends on real commercial demand (demaCome) and real commercial
+    # availability (dispo_come), which XM publishes with a ~3-day calendar lag
+    # (same-month lag family as PrecOferDesp). For recent dates (e.g. today
+    # minus 0-2 days) both can be empty: demaCome -> fall back to the PrId
+    # forecast (the same demand_pronos the preideal case uses), dispo_come ->
+    # fall back to the declared availability (dispo_declarada). Warn loudly:
+    # the user must know the run used a forecast, not the real value.
+    demand_fallback_prid = case.level == DispatchLevel.ideal and demanda.empty
+    if demand_fallback_prid:
+        print(
+            f"WARNING: DemaCome (demanda comercial real) no publicada para "
+            f"{DISPATCH_DATE} (rezago ~3 dias). Se usará el pronóstico PrId "
+            "(demand_pronos, el mismo del caso preideal) como demanda del caso ideal."
+        )
 
     if case.level == DispatchLevel.ideal:
         dispo_come = dispo_come[
             (dispo_come.datetime.dt.date == DISPATCH_DATE) & (dispo_come["resource_name"].notnull())
         ]
         dispo_come = dispo_come.drop_duplicates(subset=["resource_name", "datetime"])
+        dispo_come_empty = dispo_come.empty
+        if dispo_come_empty:
+            print(
+                f"WARNING: DispoCome (disponibilidad comercial real) no publicada para "
+                f"{DISPATCH_DATE} (rezago ~3 dias). Se usará la disponibilidad declarada "
+                f"(dispo_declarada) como Pmax del caso ideal."
+            )
         for gen in dispo["resource_name"].unique():
+            if dispo_come_empty:
+                break
             if gen in dispo_come["resource_name"].unique():
                 serie = dispo_come[(dispo_come["resource_name"] == gen)]
                 serie = (
@@ -149,11 +205,29 @@ def build_case(
     )
 
     # --- Initial conditions ---
+    # dCondIniP's real XM schema (Planta/AGC/.../ESTADOPINI1/GPPINI_1/CONFPINI1/.../TL/TFL/...)
+    # is unrelated to the old Recurso/Tipo/Gpini-1/Conf_Pini-1/T_CONF_Pini-1 columns this
+    # code was written against (see issue #34) -- normalize the 5 fields actually used
+    # downstream. Verified against real XM files for 2026-05-15/08-01/08-02/08-03:
+    # ESTADOPINI1 == "NA" <-> gen_type == HIDRAULICA (85-row cross-check, 0 mismatches);
+    # TL tracks continuous online duration (matches TFL==0 exactly whenever GPPINI_1 > 0
+    # across 85 rows, and resets to 0 in lockstep with TFL going nonzero on an
+    # online->offline transition) -- the real-schema analog of "time already committed",
+    # which is all T_CONF_Pini-1 is used for (Ton / min-up-time initial state).
     with open(resolve_input("dCondIniP", DISPATCH_DATE, dd), "r") as file:
         data = file.readlines()
-        data = [line.strip().split(",") for line in data]
+        data = [[field.strip() for field in line.strip().split(",")] for line in data]
         headers = data.pop(0)
-    condicion_inicial_planta = pd.DataFrame(data, columns=headers)
+    condicion_inicial_planta_raw = pd.DataFrame(data, columns=headers)
+    condicion_inicial_planta = pd.DataFrame(
+        {
+            "Recurso": condicion_inicial_planta_raw["Planta"],
+            "Tipo": np.where(condicion_inicial_planta_raw["ESTADOPINI1"] == "NA", "H", "T"),
+            "Gpini-1": condicion_inicial_planta_raw["GPPINI_1"],
+            "Conf_Pini-1": condicion_inicial_planta_raw["CONFPINI1"],
+            "T_CONF_Pini-1": condicion_inicial_planta_raw["TL"],
+        }
+    )
 
     with open(resolve_input("dCondIniU", DISPATCH_DATE, dd), "r") as file:
         data = file.readlines()
@@ -255,19 +329,32 @@ def build_case(
     initial_condition_df = pd.concat(
         [initial_condition_df, condicion_inicial_planta_termicas], ignore_index=True
     )
-    initial_condition_df = initial_condition_df.astype({"T_CONF_Pini-1": int, "Gpini-1": float})
+    initial_condition_df = initial_condition_df.astype({"T_CONF_Pini-1": float, "Gpini-1": float})
+    initial_condition_df["T_CONF_Pini-1"] = initial_condition_df["T_CONF_Pini-1"].astype(int)
 
     # --- Initial set to model ---
     gen_on = initial_condition_df[initial_condition_df["Gpini-1"] != 0]["Recurso"].unique()
     needed_generators = [gen for gen in list(gen_on) if gen not in ofertas.resource_name.unique()]
     for gen in needed_generators:
-        gen_oferta = oferta_full.query("resource_name == @gen").head(1).reset_index(drop=True)
+        # Ultimo precio publicado: sort ascendente por Date + tail(1) toma la
+        # fila mas reciente (misma convencion que ensure_ofertas_estimado);
+        # .head(1) sobre frame sin ordenar no garantiza nada y head(1) tras
+        # sort ascendente tomaba la mas antigua.
+        gen_oferta = (
+            oferta_full.query("resource_name == @gen")
+            .sort_values("Date")
+            .tail(1)
+            .reset_index(drop=True)
+        )
         gen_oferta.loc[0, "Date"] = pd.Timestamp(DISPATCH_DATE)
         ofertas = pd.concat([ofertas, gen_oferta], axis=0)
 
     major_generators = ofertas.resource_name.unique()
     generators = dispo.resource_name.unique()
-    timestamps = demanda["datetime"].to_dict().values()
+    if case.level == DispatchLevel.preideal or demand_fallback_prid:
+        timestamps = list(pd.date_range(DISPATCH_DATE, periods=24, freq="1h"))
+    else:
+        timestamps = demanda["datetime"].to_dict().values()
     fuel_generators = dispo[
         (dispo["resource_name"].isin(major_generators)) & (dispo["gen_type"] == "TERMICA")
     ].resource_name.unique()
@@ -290,23 +377,46 @@ def build_case(
     }
     minimo_operativo["resource"] = minimo_operativo["resource"].apply(lambda x: MO_map.get(x, x))
 
+    if precio_arranque.empty:
+        # See issue #38: OFEI for in-progress months has no PAP records (same
+        # month-calendar lag as PrecOferDesp -- verified: 0 PAP in a real
+        # 2026-08-02 file vs 678 in real closed 2024-04-18/2026-05-15 files).
+        # cold_start silently defaults to 0 for every fuel generator (pyomo
+        # Param default) until the month closes and XM republishes.
+        print(
+            "...OFEI no trae registros PAP para esta fecha (mes en curso, mismo "
+            "rezago de mes calendario que PrecOferDesp; ver issue #38): "
+            "cold_start quedara en 0 para todos los generadores termicos."
+        )
+
     generators_pap_map = {
-        gen: process.extractOne(
-            query=gen.lower(),
-            choices=precio_arranque.resource.unique(),
-            scorer=fuzz.partial_token_sort_ratio,
-            processor=lambda x: x.lower().replace(" ", ""),
-            score_cutoff=70,
-        )[0]
+        gen: results[0]
         for gen in fuel_generators
+        if (
+            results := process.extractOne(
+                query=gen.lower(),
+                choices=precio_arranque.resource.unique(),
+                scorer=fuzz.partial_token_sort_ratio,
+                processor=lambda x: x.lower().replace(" ", ""),
+                score_cutoff=70,
+            )
+        )
     }
 
     cold_start = {}
     for gen in fuel_generators:
+        if gen not in generators_pap_map:
+            if not precio_arranque.empty:
+                print(f"...no se pudo mapear precio de arranque (PAP) para {gen}. Se ignora.")
+            continue
         gen_name_mapped = generators_pap_map[gen]
+        # Arranque en frio = tipo PAPF (fria); PAPC es caliente y PAPT tibia. El
+        # Param cold_start es costo fijo por arranque en COP (se suma directo en
+        # la funcion objetivo, ver model.py) -- el PAP en COP se usa SIN escalar.
+        # Legacy app/model/load_data.py aplicaba *1e-3 por error (codigo muerto).
         gen_pap = precio_arranque[
             (precio_arranque["resource"] == gen_name_mapped)
-            & (precio_arranque.type.str.contains("C"))
+            & (precio_arranque.type.str.contains("F"))
         ]["price"].values[0]
         cold_start[gen] = float(gen_pap)
 
@@ -329,7 +439,7 @@ def build_case(
     prid_path = resolve_input("PrId", DISPATCH_DATE, dd)
     demand_pronos = pd.read_csv(prid_path, header=None, encoding="latin1")
     demand_pronos = demand_pronos.iloc[:, 1:].sum().values
-    demand_pronos = dict(zip(demanda["datetime"], demand_pronos))
+    demand_pronos = dict(zip(timestamps, demand_pronos))
 
     Ton = initial_condition_df.set_index(["Recurso"]).query("Recurso in @gen_on")["T_CONF_Pini-1"]
     Ton = Ton[Ton.index.isin(fuel_generators)]
@@ -363,7 +473,7 @@ def build_case(
             ...
 
     fixed_fuel_fire_2 = fixed_fuel_fire.copy()
-    with open(f"{dd}/preideal_dispatch_map.json", "r", encoding="utf-8") as file:
+    with storage.open("preideal_dispatch_map.json", "r", encoding="utf-8") as file:
         preideal_dispatch_map = json.load(file)
     fixed_fuel_fire_2["generador_model"] = fixed_fuel_fire_2["generator"].apply(
         lambda x: preideal_dispatch_map.get(x, "")
@@ -385,12 +495,12 @@ def build_case(
         )
 
     # --- RAMPS ---
-    with open(f"{dd}/ramps.json", "r") as file:
+    with storage.open("ramps.json", "r") as file:
         ramps = json.load(file)
 
     DEMANDA = (
         demand_pronos
-        if case.level == DispatchLevel.preideal
+        if (case.level == DispatchLevel.preideal or demand_fallback_prid)
         else (demanda.set_index("datetime")["dema"] * 1e-3).astype(int)
     )
     MAX_MIN_OP = 1 if case.level == DispatchLevel.preideal else 0

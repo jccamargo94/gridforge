@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import { RunComparisonTable } from "./run-comparison-table";
 import type { RunDetail } from "@/lib/types";
 
@@ -15,9 +16,18 @@ function makeRun(overrides: Partial<RunDetail>): RunDetail {
     finished_at: null,
     error: null,
     metrics: null,
-    artifacts: { dispatch: false, prices: false, bess: false },
+    artifacts: { dispatch: false, prices: false, bess: false, marginal_plants: false },
+    price_series: null,
     ...overrides,
   };
+}
+
+function renderTable(runs: RunDetail[]) {
+  return render(
+    <I18nProvider>
+      <RunComparisonTable runs={runs} />
+    </I18nProvider>
+  );
 }
 
 describe("RunComparisonTable", () => {
@@ -32,6 +42,8 @@ describe("RunComparisonTable", () => {
           wape: 5.5,
           smape: 4.4,
           r2: 0.9,
+          dispatch_mae_mw: null,
+          dispatch_rmse_mw: null,
           bess_charge_mwh: 10,
           bess_discharge_mwh: 9,
           bess_avg_soc_mwh: 5,
@@ -39,16 +51,16 @@ describe("RunComparisonTable", () => {
         },
       }),
     ];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText("1.5")).toBeInTheDocument();
     expect(screen.getByText("1000")).toBeInTheDocument();
   });
 
   it("shows a no-metrics marker and dashes for a run with null metrics", () => {
     const runs = [makeRun({ run_id: "r2", metrics: null })];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText(/sin metricas/i)).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 
   it("renders a dash for individual null metric fields within populated metrics", () => {
@@ -62,6 +74,8 @@ describe("RunComparisonTable", () => {
           wape: 5.5,
           smape: 4.4,
           r2: null,
+          dispatch_mae_mw: null,
+          dispatch_rmse_mw: null,
           bess_charge_mwh: 10,
           bess_discharge_mwh: 9,
           bess_avg_soc_mwh: 5,
@@ -69,10 +83,10 @@ describe("RunComparisonTable", () => {
         },
       }),
     ];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText("1.5")).toBeInTheDocument();
     expect(screen.getByText("1000")).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 
   it("shows metrics from one run even when another run has null metrics", () => {
@@ -86,6 +100,8 @@ describe("RunComparisonTable", () => {
           wape: 5.5,
           smape: 4.4,
           r2: 0.9,
+          dispatch_mae_mw: null,
+          dispatch_rmse_mw: null,
           bess_charge_mwh: 10,
           bess_discharge_mwh: 9,
           bess_avg_soc_mwh: 5,
@@ -97,10 +113,10 @@ describe("RunComparisonTable", () => {
         metrics: null,
       }),
     ];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText("1.5")).toBeInTheDocument();
     expect(screen.getByText("1000")).toBeInTheDocument();
     expect(screen.getByText(/sin metricas/i)).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 });

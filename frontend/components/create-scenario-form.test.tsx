@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import { CreateScenarioForm } from "./create-scenario-form";
 
 vi.mock("@/lib/api-client", () => ({
@@ -11,7 +12,11 @@ import { createScenario } from "@/lib/api-client";
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient();
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <I18nProvider>{ui}</I18nProvider>
+    </QueryClientProvider>
+  );
 }
 
 describe("CreateScenarioForm", () => {

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import { ScenariosTable } from "./scenarios-table";
 import type { Scenario } from "@/lib/types";
 
@@ -25,16 +26,24 @@ const scenarios: Scenario[] = [
   },
 ];
 
+function renderTable(scenarios: Scenario[]) {
+  return render(
+    <I18nProvider>
+      <ScenariosTable scenarios={scenarios} />
+    </I18nProvider>
+  );
+}
+
 describe("ScenariosTable", () => {
   it("renders one row per scenario with mode/penetration/unit count", () => {
-    render(<ScenariosTable scenarios={scenarios} />);
+    renderTable(scenarios);
     expect(screen.getByText("baseline")).toBeInTheDocument();
     expect(screen.getByText("arbitrage")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
   });
 
   it("renders an empty state with no scenarios", () => {
-    render(<ScenariosTable scenarios={[]} />);
+    renderTable([]);
     expect(screen.getByText(/sin escenarios/i)).toBeInTheDocument();
   });
 });

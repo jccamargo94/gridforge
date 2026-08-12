@@ -54,15 +54,15 @@ def parse_ofei(path: str, dispatch_date: date) -> OfeiData:
                 fline = line.split(",")
                 cc_dispo[f"{fline[0].strip()}_{conf[0]}"] = [int(disp) for disp in fline[2:]]
 
-            # Extract prices
+            # Extract prices. Only flat per-plant price lines (`GEN1, P, 45000`)
+            # belong here -- CC configuration lines (`FLORES4CC , P1, ...`) carry
+            # the config number in the type token and are handled by cc_price
+            # above, so `pri[1].strip() == "P"` excludes them (before this, " P"
+            # in pri[1] also matched P1..P4 and leaked whole-plant CC entries into
+            # prices). The real flat format is `CHIVOR , P, 151000` (verified).
             if "P" in line:
                 pri = line.split(",")
-                if (
-                    len(pri) == 3
-                    and " P" in pri[1]
-                    and "u" not in pri[1].lower()
-                    and "a" not in pri[1].lower()
-                ):
+                if len(pri) == 3 and pri[1].strip() == "P":
                     prices[pri[0]] = float(pri[2]) * 1e-3
 
     precio_arranque = pd.DataFrame(

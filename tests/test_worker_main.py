@@ -1,7 +1,8 @@
 from datetime import date
 from pathlib import Path
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db import queries
@@ -52,18 +53,19 @@ def test_process_once_solves_pending_run_end_to_end(tmp_path, monkeypatch):
     assert Path(updated.price_path).exists()
     assert Path(updated.out_dir) == Path(results_root) / run.id
 
-    # xm_smoke fixture has no preideal_price actuals -> evaluate is skipped,
-    # matching tests/test_xm_smoke_run.py's own assertion
-    assert queries.get_metric_set(session, run.id) is None
+    # xm_smoke fixture has an iMAR actuals file (MPO=150000.00) -> metrics compute
+    assert queries.get_metric_set(session, run.id) is not None
 
     # new assertions
     assert updated.log_path is not None
     log_file = Path(updated.log_path)
     assert log_file.exists()
-    # xm_smoke fixture has no preideal_price actuals, so run_case's
-    # "no XM actuals" branch (app/pipeline/runner.py:48) fires and prints —
-    # proof the log actually captured run_case's stdout, not an empty file.
-    assert "no XM actuals" in log_file.read_text()
+    # Proof the log actually captured run_case's stdout (not an empty file):
+    # ensure_data_for_date prints this line when the fixture files already
+    # exist, so it deterministically flows through the captured stream. The
+    # cbc dual-suffix warning does NOT reach the log (it goes through pyomo's
+    # logging handler, not stdout), so it can't be used as the marker here.
+    assert "Skipping download" in log_file.read_text()
 
 
 def test_process_once_marks_run_failed_when_run_case_reports_failure(tmp_path, monkeypatch):
@@ -89,3 +91,60 @@ def test_process_once_marks_run_failed_when_run_case_reports_failure(tmp_path, m
     assert updated.status == "failed"
     assert updated.error == "boom"
     assert updated.log_path is not None
+
+
+def test_process_once_marks_run_failed_when_run_case_raises(tmp_path, monkeypatch):
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+
+    def _raise(*a, **kw):
+        raise RuntimeError("solver exploded")
+
+    monkeypatch.setattr("services.worker.main.run_case", _raise)
+
+    processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "failed"
+    assert updated.error is not None
+    assert "solver exploded" in updated.error
+
+
+def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, monkeypatch):
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+
+    def _raise_db_error(*a, **kw):
+        # Poison the session with a statement error, then surface a
+        # SQLAlchemyError, mirroring a DB failure escaping from run_case.
+        try:
+            kw["session"].execute(text("SELECT * FROM no_such_table"))
+        except SQLAlchemyError:
+            pass
+        raise SQLAlchemyError("db exploded")
+
+    monkeypatch.setattr("services.worker.main.run_case", _raise_db_error)
+
+    processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "failed"
+    assert updated.error is not None

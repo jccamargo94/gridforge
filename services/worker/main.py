@@ -1,6 +1,7 @@
 import contextlib
 import io
 import time
+import traceback
 
 from sqlalchemy.orm import Session
 
@@ -39,30 +40,44 @@ def process_once(
     if run is None:
         return False
 
-    case_row = queries.get_case(session, run.case_id)
-    case = _build_case(session, case_row)
     out_dir = f"{results_root}/{run.id}"
-
-    # Close the read-only transaction _build_case's queries opened so the
-    # session sits idle (not idle-in-transaction) for the duration of the
-    # solve, instead of pinning a pooler connection with an open transaction.
-    session.commit()
-
-    log_buffer = io.StringIO()
-    with contextlib.redirect_stdout(log_buffer), contextlib.redirect_stderr(log_buffer):
-        result = run_case(case, evaluate=True, out=out_dir, data_dir=data_dir)
-
     log_path = f"{out_dir}/run.log"
-    with contextlib.suppress(OSError):
-        with get_storage(".").open(log_path, "w") as f:
-            f.write(log_buffer.getvalue())
-        run.log_path = log_path
 
-    if result.ok:
-        queries.finish_run_ok(session, run, result, out_dir=out_dir)
-    else:
-        queries.finish_run_failed(session, run, result.error or "unknown error")
-    return True
+    try:
+        case_row = queries.get_case(session, run.case_id)
+        case = _build_case(session, case_row)
+
+        # Close the read-only transaction _build_case's queries opened so the
+        # session sits idle (not idle-in-transaction) for the duration of the
+        # solve, instead of pinning a pooler connection with an open transaction.
+        session.commit()
+
+        log_buffer = io.StringIO()
+        with contextlib.redirect_stdout(log_buffer), contextlib.redirect_stderr(log_buffer):
+            result = run_case(case, evaluate=True, out=out_dir, data_dir=data_dir, session=session)
+
+        with contextlib.suppress(OSError):
+            with get_storage(".").open(log_path, "w") as f:
+                f.write(log_buffer.getvalue())
+            run.log_path = log_path
+
+        if result.ok:
+            queries.finish_run_ok(session, run, result, out_dir=out_dir)
+        else:
+            queries.finish_run_failed(
+                session, run, result.error or "unknown error", log_path=log_path
+            )
+        return True
+    except Exception as exc:
+        # Never let a per-run failure escape and crash the worker loop. Roll back
+        # any aborted/broken transaction, then record the failure. Guard the
+        # recording itself so a double-failure can't propagate either.
+        session.rollback()
+        try:
+            queries.finish_run_failed(session, run, f"{type(exc).__name__}: {exc}")
+        except Exception:
+            traceback.print_exc()
+        return True
 
 
 def main() -> None:
@@ -70,7 +85,11 @@ def main() -> None:
     session_factory = get_sessionmaker(engine)
     while True:
         with session_factory() as session:
-            processed = process_once(session)
+            try:
+                processed = process_once(session)
+            except Exception:
+                traceback.print_exc()
+                processed = False
         if not processed:
             time.sleep(POLL_INTERVAL_SECONDS)
 

@@ -134,3 +134,36 @@ def test_summary_scenario_column_and_bess_totals(monkeypatch, tmp_path):
     summary = pd.read_csv(tmp_path / "metrics-summary.csv")
     assert summary.iloc[0]["scenario"] == "10pct"
     assert "bess_net_revenue" in summary.columns
+
+
+def test_dispatch_metrics_skips_unmatched_and_computes_in_mw(monkeypatch):
+    class _Inner:
+        pout = {("TERMO1", t): float(t) for t in range(24)} | {
+            ("TERMO2", t): float(t) + 100.0 for t in range(24)
+        }
+
+    class _Model:
+        _model = _Inner()
+
+    fake_prid = {
+        # exact name match, every hour 10 MW above the model -> mae=rmse=10
+        "TERMO1": [float(t) + 10.0 for t in range(24)],
+        # no model generator matches this raw name -> must be skipped
+        "GUATAPE": [999.0] * 24,
+    }
+    monkeypatch.setattr(runner, "load_actual_dispatch", lambda d, data_dir: fake_prid)
+
+    metrics = runner._dispatch_metrics(_Model(), date(2024, 4, 18), "data")
+    assert abs(metrics["dispatch_mae_mw"] - 10.0) < 1e-9
+    assert abs(metrics["dispatch_rmse_mw"] - 10.0) < 1e-9
+
+
+def test_dispatch_metrics_empty_when_no_matches(monkeypatch):
+    class _Inner:
+        pout = {("TERMO1", t): float(t) for t in range(24)}
+
+    class _Model:
+        _model = _Inner()
+
+    monkeypatch.setattr(runner, "load_actual_dispatch", lambda d, data_dir: {"GUATAPE": [1.0] * 24})
+    assert runner._dispatch_metrics(_Model(), date(2024, 4, 18), "data") == {}

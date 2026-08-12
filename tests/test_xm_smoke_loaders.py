@@ -23,22 +23,22 @@ def test_ensure_data_for_date_is_a_noop(monkeypatch):
 
 
 def test_root_csvs_load():
-    dispo = loaders.load_dispo(DD)
+    dispo = loaders.load_dispo(DD, FECHA.year)
     assert len(dispo[dispo["datetime"].dt.date == FECHA]) == 48  # 2 generators x 24h
 
-    ofertas = loaders.load_ofertas(DD)
+    ofertas = loaders.load_ofertas(DD, FECHA.year)
     assert len(ofertas[ofertas["Date"].dt.date == FECHA]) == 2
 
-    demanda = loaders.load_demanda(DD)
+    demanda = loaders.load_demanda(DD, FECHA.year)
     assert len(demanda[demanda["datetime"].dt.date == FECHA]) == 24
 
-    agc = loaders.load_agc(DD)
+    agc = loaders.load_agc(DD, FECHA)
     assert "agc" in agc.columns
 
     params = loaders.load_parametros_plantas(DD)
     assert set(params["generador"]) == {"TERMO1", "TERMO2"}
 
-    precio_bolsa = loaders.load_precio_bolsa(DD)
+    precio_bolsa = loaders.load_precio_bolsa(DD, FECHA.year)
     assert len(precio_bolsa[precio_bolsa["datetime"].dt.date == FECHA]) == 24
 
 
@@ -46,7 +46,8 @@ def test_ofei_parses():
     ofei_path = resolve_input("OFEI", FECHA, DD)
     ofei = parse_ofei(ofei_path, FECHA)
     assert set(ofei.precio_arranque["resource"]) == {"TERMO1", "TERMO2"}
-    assert all(ofei.precio_arranque["type"].str.contains("C"))
+    # Real XM PAP schema (issue #38): fria/tibia/caliente = PAPF02/PAPT02/PAPC02
+    assert set(ofei.precio_arranque["type"].str.strip()) == {"PAPF02", "PAPT02", "PAPC02"}
     assert set(ofei.minimo_operativo["resource"]) == {"TERMO1", "TERMO2"}
     assert ofei.cc == {}
 

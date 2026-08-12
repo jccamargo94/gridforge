@@ -10,7 +10,13 @@ import pandas as pd
 
 from app.model.model import UnitCommitmentModel
 from app.pipeline.case_builder import bess_scenario_to_params
-from app.pipeline.results import extract_bess, extract_dispatch, extract_mpo, save_results
+from app.pipeline.results import (
+    extract_bess,
+    extract_dispatch,
+    extract_marginal_plants,
+    extract_mpo,
+    save_results,
+)
 from app.schemas import DispatchCase, DispatchLevel
 from app.schemas.bess import BessMode, BessScenario, BessUnit
 
@@ -61,13 +67,44 @@ def test_extract_dispatch_rows():
     assert abs(by_gen["B"] - 50.0) < 1e-6
 
 
+def test_extract_marginal_plants_from_solved_model():
+    # A is at its cap (100/100 -> not marginal), B is at partial load
+    # (50/100 -> marginal). Both (g, t) rows must be present.
+    m, _ = _toy_model()
+    df = extract_marginal_plants(m)
+    assert set(df.columns) == {"datetime", "generador", "dispatch", "pmax", "is_marginal"}
+    assert len(df) == 2
+    by_gen = df.set_index("generador")
+    assert not by_gen.loc["A", "is_marginal"]
+    assert by_gen.loc["B", "is_marginal"]
+
+
+def test_extract_marginal_plants_zero_and_pmax_not_marginal():
+    class _Inner:
+        pout = {("A", 1): 0.0, ("B", 1): 50.0, ("C", 1): 100.0}
+        Pmax = {("A", 1): 100.0, ("B", 1): 100.0, ("C", 1): 100.0}
+
+    class _Model:
+        _model = _Inner()
+
+    df = extract_marginal_plants(_Model())
+    assert len(df) == 3
+    by_gen = df.set_index("generador")
+    assert not by_gen.loc["A", "is_marginal"]  # at 0
+    assert by_gen.loc["B", "is_marginal"]  # 0 < 50 < 100
+    assert not by_gen.loc["C", "is_marginal"]  # at Pmax
+    assert abs(by_gen.loc["B", "pmax"] - 100.0) < 1e-9
+
+
 def test_save_results_writes_csvs(tmp_path):
     m, case = _toy_model()
     result = save_results(m, case, out=str(tmp_path))
     assert (tmp_path / f"dispatch_by_gen-{case.dispatch_date}-{case.level.value}.csv").exists()
     assert (tmp_path / f"marginal_price-{case.dispatch_date}-{case.level.value}.csv").exists()
+    assert (tmp_path / f"marginal_plants-{case.dispatch_date}-{case.level.value}.csv").exists()
     assert result.ok is True
     assert result.dispatch_path is not None
+    assert result.marginal_plants_path is not None
 
 
 def _bess_case_and_model():

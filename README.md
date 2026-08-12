@@ -1,21 +1,29 @@
-# despacho-udea — modelo academico de despacho electrico colombiano
+# GridForge — modelo académico de despacho eléctrico colombiano
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
-[![Docs](https://img.shields.io/badge/docs-github%20pages-informational.svg)](https://jccamargo94.github.io/despacho-udea/)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-informational.svg)](https://jccamargo94.github.io/gridforge/)
+[![Tests](https://img.shields.io/badge/tests-228%20passed-green.svg)](tests/)
 
-Repositorio academico para aproximar el despacho electrico colombiano, comparar
-resultados contra informacion publicada por XM y estudiar el efecto de incorporar
-BESS (Battery Energy Storage Systems) bajo distintos modos de participacion.
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="GridForge logo" width="120" height="120">
+</p>
+
+Modelo académico de **unit commitment** en Pyomo que aproxima el despacho
+eléctrico colombiano, reproduce el **precio de bolsa** publicado por
+[XM](https://www.xm.com.co/) (predespacho ideal y despacho ideal) y estudia el
+efecto de incorporar **BESS** (Battery Energy Storage Systems) bajo distintos
+modos de participación.
+
+Se distribuye como librería Python + CLI Typer, con backend FastAPI, worker de
+ejecución por polling y frontend Next.js, todo dockerizado para desarrollo y
+operación reproducibles.
 
 Este README es el punto de entrada para humanos y agentes de IA. Antes de hacer
 cambios, lea especialmente las secciones de estado actual, datos requeridos y
-brechas conocidas.
-
-**📖 Documentación pública:** https://jccamargo94.github.io/despacho-udea/
-- Publicada automáticamente desde [docs/](docs/) mediante GitHub Pages y Jekyll
-- Incluye [formulación matemática](https://jccamargo94.github.io/despacho-udea/formulacion-matematica.html)
-de unit commitment y BESS
+brechas conocidas. La documentación pública del proyecto vive en
+[docs/index.md](docs/index.md) y se publica en
+[GitHub Pages](https://jccamargo94.github.io/gridforge/).
 
 ## English summary
 
@@ -26,7 +34,7 @@ under different market participation modes. Ships as a Python domain library +
 Typer CLI, a FastAPI backend with a polling worker, a Next.js frontend, and a
 Dockerized dev setup. Jump to [Quickstart](#quickstart) to run it locally, or
 [Repository map](#5-mapa-del-repositorio) for the layout. Full docs (Spanish)
-continue below and at the [GitHub Pages site](https://jccamargo94.github.io/despacho-udea/).
+continue below and at the [GitHub Pages site](https://jccamargo94.github.io/gridforge/).
 
 ## Quickstart
 
@@ -85,7 +93,7 @@ La hoja de ruta extendida esta en
 [docs/roadmap-aplicacion-despacho.md](docs/roadmap-aplicacion-despacho.md). El
 sitio público se publica desde [docs/index.md](docs/index.md) con la
 formulación matemática en [docs/formulacion-matematica.md](docs/formulacion-matematica.md)
-(renderizada en vivo como [formulación matemática](https://jccamargo94.github.io/despacho-udea/formulacion-matematica.html)).
+(renderizada en vivo como [formulación matemática](https://jccamargo94.github.io/gridforge/formulacion-matematica.html)).
 
 ---
 
@@ -97,7 +105,7 @@ La documentación del repositorio ahora se actualiza en dos capas:
   [AGENTS.md](AGENTS.md) y en las reglas de [.agents/rules](.agents/rules).
 - La documentación pública para GitHub Pages vive en [docs/index.md](docs/index.md)
   y [docs/formulacion-matematica.md](docs/formulacion-matematica.md), publicada
-  en https://jccamargo94.github.io/despacho-udea/ mediante GitHub Actions y Jekyll.
+  en https://jccamargo94.github.io/gridforge/ mediante GitHub Actions y Jekyll.
 
 Hoy el repositorio ya no es solo una coleccion de notebooks. Existe una primera
 extraccion hacia una aplicacion Python:
@@ -192,7 +200,7 @@ app/
     scenarios.py     # carga escenarios BESS declarativos (scenarios/bess/*.yaml)
   schemas/           # modelos pydantic v2: DispatchCase, InputPack, RunResult, BessScenario
   storage/           # abstraccion Storage (LocalStorage hoy; GCS a futuro)
-  db/                # modelos SQLAlchemy y acceso a datos (runs, metric_sets)
+  db/                # modelos SQLAlchemy y acceso a datos (runs, metric_sets, input_datasets)
   utils/
     metrics.py      # metricas de evaluacion
     misc.py         # compatibilidad hacia app.data.download
@@ -210,13 +218,17 @@ get_date_results.py # runner legado batch
 notebooks/*.ipynb   # notebooks exploratorios y ETL no migrado
 
 docs/
-  index.md                        # landing page del sitio (GitHub Pages, Jekyll)
-  formulacion-matematica.md       # formulacion matematica publicada
+  index.md                        # landing page del sitio (GitHub Pages, Jekyll, con branding GridForge)
+  formulacion-matematica.md       # formulacion matematica publicada (preideal/ideal, BESS, precio marginal)
   roadmap-aplicacion-despacho.md  # vision y fases hacia app dockerizada
+  _config.yml                     # config Jekyll del sitio (baseurl /gridforge)
+  _layouts/                       # layout HTML con header/footer de marca
+  _includes/                      # header/footer reutilizables
+  assets/                         # logo.svg y main.css del sitio
   superpowers/specs/              # diseno de la CLI actual
   superpowers/plans/              # plan de implementacion de la CLI actual
 
-.github/workflows/pages.yml  # publica docs/ a GitHub Pages en push a main/develop
+.github/workflows/pages.yml  # publica docs/ a GitHub Pages (Jekyll) en push a develop
 
 tests/               # suite pytest
 data/                # insumos y resultados; git-ignored
@@ -280,8 +292,8 @@ eso los comandos usan `-f docker/...` y `--project-directory .` (ancla
 `./data`, `./.env` y el build context a la raiz en vez de a `docker/`).
 
 ```bash
-docker build -f docker/Dockerfile.cli -t despacho-udea .
-docker run --rm --entrypoint uv despacho-udea run --no-sync python -c \
+docker build -f docker/Dockerfile.cli -t gridforge .
+docker run --rm --entrypoint uv gridforge run --no-sync python -c \
   "import pyomo.environ as pyo; print('cbc', pyo.SolverFactory('cbc').available())"
 ```
 
@@ -320,13 +332,18 @@ descargado.
 Estos archivos son consumidos por [app/data/loaders.py](app/data/loaders.py):
 
 ```text
-data/dispo_declarada.csv
-data/ofertas.csv
-data/demaCome.csv
-data/agc_asignado.csv
+# Archivos pydataxm (descargados automáticamente por año)
+data/dispo_declarada/dispo_declarada_{year}.csv
+data/ofertas/ofertas_{year}.csv
+data/demaCome/demaCome_{year}.csv
+data/precio_bolsa/precio_bolsa_{year}.csv
+data/dispo_come/dispo_come_{year}.csv
+
+# Archivo AGC por fecha (descargado automáticamente por fecha)
+data/{YYYY-MM-DD}/agc_asignado.csv
+
+# Archivo manual (sin descarga automática)
 data/parametros_plantas.csv
-data/precio_bolsa/precio_bolsa_2024.csv
-data/DispoCome_resource.csv   # requerido para tipos ideal
 ```
 
 ### Archivos auxiliares
@@ -350,8 +367,24 @@ data/preideal_dispatch/{YYYY-MM-DD}.txt
 `app/data/download.py` descarga archivos por fecha hacia `data/{YYYY-MM-DD}/`.
 La CLI invoca `ensure_data_for_date()` cuando necesita datos por fecha.
 
-Los CSVs base todavia dependen principalmente de `notebooks/data_fetcher.ipynb`;
-esa ETL no esta migrada por completo a la aplicacion.
+Los cinco archivos pydataxm (`dispo_declarada`, `ofertas`, `demaCome`, `precio_bolsa` y `dispo_come`)
+se descargan automáticamente por año en `data/{dataset}/{dataset}_{year}.csv` la primera vez
+que se corre una fecha de ese año.
+
+`agc_asignado.csv` se descarga automáticamente por fecha en `data/{YYYY-MM-DD}/agc_asignado.csv`.
+
+Ambos grupos no requieren descarga manual — la CLI genera los archivos bajo demanda.
+
+`PrecOferDesp` (ofertas) se publica por mes calendario completo, un mes despues
+(agosto completo solo esta disponible desde el 1 de septiembre): correr una
+fecha del mes en curso falla con un error explicito, no es un bug.
+Ver issue #30 para una heuristica de fallback para fechas recientes.
+
+`parametros_plantas.csv` sigue siendo mantenido a mano — no hay mecanismo de
+descarga (la fuente real, Paratec, requiere una decision de modelado sobre como
+reducir sus parametros por-unidad/por-configuracion a los escalares planos que
+el modelo usa hoy; ver `docs/superpowers/specs/2026-08-06-ingesta-storage-xm-design.md`
+seccion 7).
 
 ---
 
@@ -433,6 +466,8 @@ Migraciones (requiere `DATABASE_URL` en el entorno):
 uv run alembic upgrade head
 ```
 
+La tabla `input_datasets` es creada por la migracion 0003 pero su logica de lectura/escritura (ingesta desde XM) aun no esta integrada en `app/`; es un artefacto fundacional de Fase 6 pendiente.
+
 Recuperacion manual de una corrida atascada: si una fila `runs` queda en
 `running` de forma permanente (p. ej. el worker murio a mitad de un solve),
 resetear su `status` a `pending` para que el worker la re-reclame. Si la
@@ -477,6 +512,7 @@ Por cada `(fecha, tipo)` se escriben archivos en `data/results/`:
 dispatch_by_gen-{date}-{type}.csv
 marginal_price-{date}-{type}.csv
 metrics-{date}-{type}.csv
+marginal_plants-{date}-{type}.csv
 ```
 
 Cuando hay evaluacion, tambien se genera:
@@ -486,6 +522,28 @@ data/results/metrics-summary.csv
 ```
 
 El resumen incluye metricas como RMSE, MAE, bias, WAPE, sMAPE y R2.
+
+### Referencia de comparacion por nivel
+
+- **Preideal**: el precio marginal del modelo se compara contra el **MPO del
+  predespacho ideal** (archivo iMAR).
+- **Ideal**: se compara contra el **precio de bolsa real** (PrecBolsNaci, archivo
+  `precio_bolsa_{year}.csv`), con el MPO de iMAR como referencia secundaria.
+
+### Resultados del modo ideal (2026)
+
+Corridas de validacion del despacho ideal contra el precio de bolsa real:
+
+| Fecha | Referencia | RMSE precio (COP/MWh) | MAE precio (COP/MWh) | MAE despacho (MW) |
+|---|---|---|---|---|
+| 2026-02-10 | Bolsa real | 114,227 | 44,961 | 10.3 |
+| 2026-05-15 | Bolsa real | 43,435 | 26,636 | 10.8 |
+| 2026-08-02 | Bolsa real | 299,640 | 284,340 | 8.8 |
+| 2026-08-11 | MPO iMAR* | 970,462 | 970,023 | 16.5 |
+
+*La bolsa real de 2026-08-11 aun no esta publicada; la corrida uso demanda y
+disponibilidad pronosticadas (fallback con advertencia) y se comparo contra el
+MPO de iMAR.
 
 Para escenarios BESS, una brecha actual es guardar de forma mas completa carga,
 descarga, SOC, costos/ingresos y remuneracion. Hoy el pipeline guarda el

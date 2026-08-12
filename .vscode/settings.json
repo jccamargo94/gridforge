@@ -1,4 +1,5 @@
 {
     "python.analysis.typeCheckingMode": "off",
-    "jupyter.notebookFileRoot": "${workspaceFolder}"
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "python.defaultInterpreterPath": "/home/user/projects/udea/gridforge/.venv/bin/python"
 }

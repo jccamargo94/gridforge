@@ -1,3 +1,14 @@
+---
+name: documentation-maintainer
+description: >
+  Keeps gridforge documentation aligned with the real implementation (README, AGENTS,
+  docs/ site, GitHub Pages workflow) — not an idealized roadmap. Use when documentation
+  needs an update, a docs refresh, or a GitHub Pages publication pass; when a CLI, data
+  pipeline, model, schema, deployment layout, or supported scenario changed and docs
+  must follow. Trigger: /docs, "actualizar docs", "docs desactualizada", "refresh docs",
+  "GitHub Pages", "documentación".
+---
+
 # Documentation maintainer
 
 Use this skill when the repository needs documentation updates, a docs refresh, or a GitHub Pages publication pass.

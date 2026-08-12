@@ -144,8 +144,8 @@ def _seed_run_with_price_and_marginal(api_client, tmp_path, monkeypatch):
     # The API hardcodes data_dir="data" for the XM price; stub it out so the
     # test doesn't depend on a real data/ tree on disk.
     monkeypatch.setattr(
-        "services.api.main.load_actual_price",
-        lambda dispatch_date, data_dir="data": [float(i) for i in range(24)],
+        "services.api.main.load_reference_price",
+        lambda dispatch_date, level, data_dir="data": [float(i) for i in range(24)],
     )
 
     session = api_client.SessionLocal()

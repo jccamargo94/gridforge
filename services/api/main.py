@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from app.data.actuals import load_actual_price
+from app.data.actuals import load_reference_price
 from app.db import queries
 from app.db.session import get_engine, get_sessionmaker
 from app.schemas import BessScenario, DispatchLevel
@@ -103,7 +103,7 @@ def _price_comparison_df(run, case) -> pd.DataFrame | None:
     try:
         with storage.open(run.price_path) as f:
             df = pd.read_csv(f, parse_dates=["datetime"])
-        xm = load_actual_price(case.dispatch_date, data_dir="data")
+        xm = load_reference_price(case.dispatch_date, level=case.level, data_dir="data")
     except (FileNotFoundError, ValueError):
         return None
     df = df.sort_values("datetime")

@@ -22,6 +22,7 @@ CANDIDATE_SUBDIRS = {
     "dCondIniU": ["condicion_inicial/{date}", "{date}"],
     "PrId": ["predespacho_ideal", "{date}"],
     "iMAR": ["predespacho_ideal", "{date}"],
+    "dAGCUNIDAD": ["{date}"],
 }
 
 

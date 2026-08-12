@@ -155,6 +155,125 @@ def test_estimate_ofertas_resolved_resource_without_history_still_gets_row():
     assert result.set_index("resource_name")["Value"].to_dict() == {"TERMO1": 990.0}
 
 
+def test_detect_marginal_sole_candidate_in_two_hours_uses_first_hour():
+    # TERMO1 es candidato unico en horas 2 y 10 -- se resuelve con la primera
+    # en orden de hora (0->23): eleccion arbitraria pero determinista, no un bug.
+    predespacho = {
+        "TERMO1": [300.0] * 2 + [150.0] + [300.0] * 7 + [150.0] + [300.0] * 13,
+        "TERMO2": [200.0] * 24,
+    }
+    dispo_declarada = {"TERMO1": [300.0] * 24, "TERMO2": [200.0] * 24}
+    assert detect_marginal_resources(predespacho, dispo_declarada) == {"TERMO1": 2}
+
+
+def test_estimate_ofertas_disagreement_between_reliable_hours_keeps_one_value():
+    # Mismo layout del anterior: TERMO1 candidato unico en horas 2 y 10, con
+    # MPO distinto en cada hora. Solo se asigna UNA Value (gana la hora 2, la
+    # mas temprana); la hora 10 queda ignorada -- nunca dos valores por recurso.
+    predespacho = {
+        "TERMO1": [300.0] * 2 + [150.0] + [300.0] * 7 + [150.0] + [300.0] * 13,
+        "TERMO2": [200.0] * 24,
+    }
+    dispo_declarada = {"TERMO1": [300.0] * 24, "TERMO2": [200.0] * 24}
+    mpo_by_hour = [1000.0] * 2 + [990000.0] + [1000.0] * 7 + [750000.0] + [1000.0] * 13
+    result = estimate_ofertas(
+        _date(2026, 8, 11), predespacho, dispo_declarada, mpo_by_hour, {"TERMO1": 100.0}
+    )
+    assert len(result) == 1
+    assert result.iloc[0]["Value"] == 990.0
+
+
+def test_detect_marginal_multiple_ambiguous_hours_resolves_nothing():
+    # TERMO1 y TERMO2 candidatos ambos en horas 3 y 4, y en ningun otro lugar:
+    # ninguna hora tiene un unico candidato, la eliminacion nunca aísla a nadie.
+    predespacho = {
+        "TERMO1": [300.0] * 3 + [150.0, 150.0] + [300.0] * 19,
+        "TERMO2": [200.0] * 3 + [100.0, 100.0] + [200.0] * 19,
+    }
+    dispo_declarada = {"TERMO1": [300.0] * 24, "TERMO2": [200.0] * 24}
+    assert detect_marginal_resources(predespacho, dispo_declarada) == {}
+
+
+def test_detect_marginal_mid_day_zero_dispo_hour_resolves_other_hour():
+    # Hora 12 con dispo 0 Y despacho 0 (mantenimiento): no es candidata
+    # (0<0 falso) y no revienta. La hora 5 es la unica a media maquina.
+    despacho = [0.0] * 5 + [150.0] + [0.0] * 6 + [0.0] + [0.0] * 11
+    dispo = [300.0] * 5 + [300.0] + [300.0] * 6 + [0.0] + [300.0] * 11
+    assert detect_marginal_resources({"TERMO1": despacho}, {"TERMO1": dispo}) == {"TERMO1": 5}
+
+
+def test_detect_marginal_dispatch_above_zero_with_zero_dispo_not_candidate():
+    # despacho=50 pero dispo=0 en la hora 12: 0<50<0 es falso, no es candidata
+    # y no revienta comparando floats con un disponible nulo.
+    despacho = [0.0] * 12 + [50.0] + [0.0] * 11
+    dispo = [300.0] * 24
+    dispo[12] = 0.0
+    assert detect_marginal_resources({"TERMO1": despacho}, {"TERMO1": dispo}) == {}
+
+
+def test_detect_marginal_edge_hours_resolve():
+    # Las horas 0 y 23 son horas validas de resolucion (bordes del dia).
+    dispo_declarada = {"TERMO1": [300.0] * 24}
+    assert detect_marginal_resources({"TERMO1": [150.0] + [300.0] * 23}, dispo_declarada) == {
+        "TERMO1": 0
+    }
+    assert detect_marginal_resources({"TERMO1": [300.0] * 23 + [150.0]}, dispo_declarada) == {
+        "TERMO1": 23
+    }
+
+
+def test_detect_marginal_full_loading_and_zero_are_not_candidates():
+    # despachado == disponible (al tope) y despachado == 0: ninguno es candidato
+    # "a media maquina" (la regla es 0 < despachado < disponible).
+    predespacho = {"TERMO1": [300.0] * 24, "TERMO2": [0.0] * 24}
+    dispo_declarada = {"TERMO1": [300.0] * 24, "TERMO2": [200.0] * 24}
+    assert detect_marginal_resources(predespacho, dispo_declarada) == {}
+
+
+def test_estimate_ofertas_absent_and_never_marginal_resource_not_in_result():
+    # Un recurso que nunca margina y sin precio historico no aparece en el
+    # resultado; con historico, aparece solo con el ultimo precio publicado.
+    predespacho = {"TERMO1": [300.0] * 24, "TERMO2": [0.0] * 24}
+    dispo_declarada = {"TERMO1": [300.0] * 24, "TERMO2": [200.0] * 24}
+    assert estimate_ofertas(
+        _date(2026, 8, 11), predespacho, dispo_declarada, [990000.0] * 24, {}
+    ).empty
+    result = estimate_ofertas(
+        _date(2026, 8, 11),
+        predespacho,
+        dispo_declarada,
+        [990000.0] * 24,
+        {"TERMO3": 150.0},
+    )
+    assert result.set_index("resource_name")["Value"].to_dict() == {"TERMO3": 150.0}
+
+
+def test_estimate_ofertas_resolved_value_wins_over_ultimo_precio():
+    # Recurso resuelto como marginal Y con precio historico: gana el MPO
+    # inferido de la hora resuelta, no el ultimo precio publicado.
+    predespacho = {"TERMO1": [0.0] * 5 + [150.0] + [300.0] * 18}
+    dispo_declarada = {"TERMO1": [300.0] * 24}
+    mpo_by_hour = [1000.0] * 5 + [990000.0] + [1000.0] * 18
+    result = estimate_ofertas(
+        _date(2026, 8, 11), predespacho, dispo_declarada, mpo_by_hour, {"TERMO1": 100.0}
+    )
+    assert result.set_index("resource_name")["Value"].to_dict() == {"TERMO1": 990.0}
+
+
+def test_detect_marginal_real_like_all_candidate_hours_ambiguous_resolves_nothing():
+    # Patron real 2026-08-02 (verificado en datos reales): 153 recursos a media
+    # maquina pero todas las horas con candidatos tienen >=2 -- la eliminacion
+    # nunca aísla ninguno, resolved == {} y la heuristica degrada al fallback de
+    # ultimo precio. No es un bug, es el comportamiento previsto; se fija aqui.
+    predespacho = {
+        "A": [300.0] * 9 + [150.0, 150.0] + [300.0] * 13,
+        "B": [300.0] * 9 + [100.0, 100.0] + [300.0] * 13,
+        "C": [300.0] * 9 + [50.0, 50.0] + [300.0] * 13,
+    }
+    dispo_declarada = {"A": [300.0] * 24, "B": [300.0] * 24, "C": [300.0] * 24}
+    assert detect_marginal_resources(predespacho, dispo_declarada) == {}
+
+
 def _write_prid_imar(tmp_path, fecha_str="2026-08-11", mmdd="0811"):
     day_dir = tmp_path / fecha_str
     day_dir.mkdir(parents=True, exist_ok=True)

@@ -155,6 +155,35 @@ def test_estimate_ofertas_resolved_resource_without_history_still_gets_row():
     assert result.set_index("resource_name")["Value"].to_dict() == {"TERMO1": 990.0}
 
 
+def test_detect_marginal_treats_cc_plant_as_flat_whole_plant():
+    # Decision issue #36: CC plants son candidatos a nivel de planta completa
+    # (Value plano), no por configuracion -- PrId/dispo frescos traen la planta
+    # completa y OFEI cc_dispo esta mes-atrasada (vacia para fechas recientes).
+    predespacho = {
+        "FLORES 4 CC": [0.0] * 5 + [250.0] + [400.0] * 18,  # part-load solo hora 5
+        "TERMO1": [300.0] * 24,  # nunca candidato
+    }
+    dispo_declarada = {
+        "FLORES 4 CC": [400.0] * 24,
+        "TERMO1": [300.0] * 24,
+    }
+    resolved = detect_marginal_resources(predespacho, dispo_declarada)
+    assert resolved == {"FLORES 4 CC": 5}
+
+    mpo_by_hour = [1000.0] * 5 + [990000.0] + [1000.0] * 18
+    result = estimate_ofertas(
+        _date(2026, 8, 11),
+        predespacho,
+        dispo_declarada,
+        mpo_by_hour,
+        {"FLORES 4 CC": 100.0, "TERMO1": 180.0},
+    )
+    assert result.set_index("resource_name")["Value"].to_dict() == {
+        "FLORES 4 CC": 990.0,  # resuelto como planta: MPO hora 5 / 1e3
+        "TERMO1": 180.0,
+    }
+
+
 def test_detect_marginal_sole_candidate_in_two_hours_uses_first_hour():
     # TERMO1 es candidato unico en horas 2 y 10 -- se resuelve con la primera
     # en orden de hora (0->23): eleccion arbitraria pero determinista, no un bug.

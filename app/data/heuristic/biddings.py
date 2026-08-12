@@ -6,6 +6,15 @@ nacional por hora) estan frescos hasta hoy, a diferencia de PrecOferDesp
 esta "a media maquina" (candidato a marginar) cada hora, y le asigna el
 MPO de la hora en que se resuelve como su precio de oferta -- ver
 docs/superpowers/specs/2026-08-11-ofertas-heuristica-precios-design.md.
+
+Ciclo combinado (CC): se tratan a nivel de planta completa (un solo "Value"
+plano), igual que PrecOferDesp, no por configuracion (P1..P4). Decision issue
+#36: PrId y dispo_declarada frescos traen la planta CC completa (no
+configuraciones), y la granularidad por configuracion (OFEI cc_dispo/cc_price)
+comparte el rezago de mes calendario de PrecOferDesp -- esta vacia
+exactamente en las fechas que esta heuristica debe estimar. El split por
+configuracion sigue siendo el camino de los meses cerrados, via cc_price/
+cc_dispo en case_builder.py.
 """
 
 import csv

@@ -208,3 +208,17 @@ agregan iterativamente, ver [#35](https://github.com/jccamargo94/gridforge/issue
 - El ciclo de calibracion (comparar contra dispatch real) no se puede probar
   end-to-end hasta que [#34](https://github.com/jccamargo94/gridforge/issues/34) este
   resuelto.
+
+## Adendum 2026-08-11 (issue [#36](https://github.com/jccamargo94/gridforge/issues/36)): decision -- CC se mantiene plana en la heuristica
+
+Verificado contra datos reales: `PrId` de una fecha reciente (2026-08-02) lista las
+plantas CC por planta completa (`"FLORES 4 CC"`), y `dispo_declarada` (fresca) igual.
+La granularidad por configuracion solo existe en OFEI (`cc_dispo`/`cc_price`), que
+comparte el rezago de mes calendario de PrecOferDesp y por tanto esta vacia
+exactamente en las fechas que la heuristica debe estimar. Por eso v1 (y el plan de
+[#30](https://github.com/jccamargo94/gridforge/issues/30)) dejan CC como recurso plano
+de planta completa: el candidato "a media maquina" se detecta a nivel de planta y su
+`Value` = MPO de la hora resuelta / 1e3, igual que el resto. El split por configuracion
+sigue siendo el camino de los meses cerrados, via `cc_price`/`cc_dispo` en
+`case_builder.py`. #36 se cierra con esta decision: no se implementa estimacion por
+configuracion en la heuristica.

@@ -100,7 +100,11 @@ ci_dir.mkdir(parents=True, exist_ok=True)
 
 ofei_lines = []
 for g in GENERATORS:
-    ofei_lines.append(f"{g['name']},C PAPC,{g['pap_cop']}")
+    # Real XM PAP schema (issue #38): tres tipos por recurso, fria/tibia/caliente
+    # (PAPF02/PAPT02/PAPC02), precios en COP. cold_start selecciona el tipo frio.
+    ofei_lines.append(f"{g['name']}, PAPF02,{g['pap_cop']}")
+    ofei_lines.append(f"{g['name']}, PAPT02,{int(g['pap_cop'] * 0.8)}")
+    ofei_lines.append(f"{g['name']}, PAPC02,{int(g['pap_cop'] * 0.6)}")
 for g in GENERATORS:
     mo_vals = ",".join(str(g["mo"]) for _ in range(24))
     ofei_lines.append(f"{g['name']}, MO,{mo_vals}")

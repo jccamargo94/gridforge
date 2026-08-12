@@ -56,3 +56,20 @@ def test_alembic_upgrade_head_creates_input_datasets_table(tmp_path):
     unique_constraints = inspect(engine).get_unique_constraints("input_datasets")
     constraint_names = {c["name"] for c in unique_constraints}
     assert "uq_input_datasets_dataset_partition_key" in constraint_names
+
+
+def test_alembic_upgrade_head_adds_dispatch_metric_columns(tmp_path):
+    db_path = tmp_path / "migration_smoke_dispatch.db"
+    database_url = f"sqlite:///{db_path}"
+
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(database_url)
+
+    metric_columns = {c["name"] for c in inspect(engine).get_columns("metric_sets")}
+    assert {"dispatch_mae_mw", "dispatch_rmse_mw"}.issubset(metric_columns)
+
+    run_columns = {c["name"] for c in inspect(engine).get_columns("runs")}
+    assert "marginal_plants_path" in run_columns

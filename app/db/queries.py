@@ -82,6 +82,7 @@ def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -
     run.dispatch_path = result.dispatch_path
     run.price_path = result.price_path
     run.bess_path = result.bess_path
+    run.marginal_plants_path = result.marginal_plants_path
     session.add(run)
 
     if result.metrics is not None or result.bess_summary is not None:
@@ -100,6 +101,8 @@ def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -
                 bess_discharge_mwh=bess.get("bess_discharge_mwh"),
                 bess_avg_soc_mwh=bess.get("bess_avg_soc_mwh"),
                 bess_net_revenue=bess.get("bess_net_revenue"),
+                dispatch_mae_mw=metrics.get("dispatch_mae_mw"),
+                dispatch_rmse_mw=metrics.get("dispatch_rmse_mw"),
             )
         )
     session.commit()

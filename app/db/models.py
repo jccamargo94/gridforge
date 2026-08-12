@@ -68,6 +68,7 @@ class Run(Base):
     price_path: Mapped[str | None] = mapped_column(String, nullable=True)
     bess_path: Mapped[str | None] = mapped_column(String, nullable=True)
     log_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    marginal_plants_path: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class MetricSet(Base):
@@ -85,6 +86,8 @@ class MetricSet(Base):
     bess_discharge_mwh: Mapped[float | None] = mapped_column(Float, nullable=True)
     bess_avg_soc_mwh: Mapped[float | None] = mapped_column(Float, nullable=True)
     bess_net_revenue: Mapped[float | None] = mapped_column(Float, nullable=True)
+    dispatch_mae_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    dispatch_rmse_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class InputDataset(Base):

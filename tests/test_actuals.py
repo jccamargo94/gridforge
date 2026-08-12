@@ -17,11 +17,17 @@ def test_load_actual_price(tmp_path):
     assert vals[0] == 0.0 and vals[23] == 23.0
 
 
-def test_load_actual_dispatch_decodes_latin1(tmp_path):
-    # Real XM plant names contain latin1-only bytes (e.g. GUATAPE with an
-    # accented E, 0xC9 in latin1 -- not valid UTF-8). Must not raise, and the
-    # accented character must round-trip correctly.
-    (tmp_path / "preideal_dispatch").mkdir()
-    (tmp_path / "preideal_dispatch" / "2024-04-18.txt").write_bytes(b"GUATAP\xc9,1,2\n")
-    df = load_actual_dispatch(date(2024, 4, 18), data_dir=str(tmp_path))
-    assert df.iloc[0, 0] == "GUATAPÉ"
+def test_load_actual_dispatch_reads_prid_latin1(tmp_path):
+    # PrId: una fila por recurso, `nombre,v0,...,v23`. Real XM plant names
+    # contain latin1-only bytes (e.g. GUATAPE with an accented E, 0xC9 in
+    # latin1 -- not valid UTF-8). Must not raise, the accented character must
+    # round-trip correctly, and the result is {resource: [24 MW]}.
+    (tmp_path / "2024-04-18").mkdir()
+    values = [float(i) for i in range(24)]
+    body = ",".join(str(v) for v in values)
+    (tmp_path / "2024-04-18" / "PrId0418_NAL.txt").write_bytes(
+        ("GUATAP\xc9," + body + "\n").encode("latin1")
+    )
+    out = load_actual_dispatch(date(2024, 4, 18), data_dir=str(tmp_path))
+    assert set(out) == {"GUATAPÉ"}
+    assert out["GUATAPÉ"] == values

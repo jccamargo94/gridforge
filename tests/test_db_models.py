@@ -64,6 +64,32 @@ def test_case_scenario_id_defaults_to_none():
         assert case.scenario_id is None
 
 
+def test_dispatch_metrics_and_marginal_plants_round_trip():
+    engine = _memory_engine()
+    with Session(engine) as session:
+        case = Case(dispatch_date=date(2024, 4, 18), level="preideal")
+        session.add(case)
+        session.flush()
+
+        run = Run(
+            case_id=case.id,
+            user_id="user-1",
+            status="pending",
+            marginal_plants_path="data/results/mp.csv",
+        )
+        session.add(run)
+        session.flush()
+
+        metric_set = MetricSet(run_id=run.id, dispatch_mae_mw=1.5, dispatch_rmse_mw=2.5)
+        session.add(metric_set)
+        session.commit()
+
+        assert session.get(Run, run.id).marginal_plants_path == "data/results/mp.csv"
+        fetched = session.get(MetricSet, metric_set.id)
+        assert fetched.dispatch_mae_mw == 1.5
+        assert fetched.dispatch_rmse_mw == 2.5
+
+
 def test_input_dataset_round_trip():
     engine = _memory_engine()
     with Session(engine) as session:

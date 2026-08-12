@@ -3,11 +3,9 @@
 from datetime import date
 
 import numpy as np
-import pandas as pd
 
-from app.data.heuristic.biddings import parse_mpo
+from app.data.heuristic.biddings import parse_mpo, parse_predespacho
 from app.data.paths import resolve_input
-from app.storage import get_storage
 
 
 def load_actual_price(dispatch_date: date, data_dir: str = "data") -> np.ndarray:
@@ -19,8 +17,9 @@ def load_actual_price(dispatch_date: date, data_dir: str = "data") -> np.ndarray
     return np.array(parse_mpo(raw))
 
 
-def load_actual_dispatch(dispatch_date: date, data_dir: str = "data") -> pd.DataFrame:
-    """XM predispatch generation matrix for the date (raw, latin1-encoded)."""
-    storage = get_storage(data_dir)
-    with storage.open(f"preideal_dispatch/{dispatch_date}.txt", "rb") as f:
-        return pd.read_csv(f, header=None, encoding="latin1")
+def load_actual_dispatch(dispatch_date: date, data_dir: str = "data") -> dict[str, list[float]]:
+    """XM predespacho ideal generation per resource for the date as
+    {resource: [24 hourly MW]}, read from the per-date PrId file."""
+    path = resolve_input("PrId", dispatch_date, data_dir)
+    with open(path, encoding="latin1") as f:
+        return parse_predespacho(f.read())

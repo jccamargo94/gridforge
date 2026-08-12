@@ -15,6 +15,7 @@ from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+from sqlalchemy.orm import Session
 from thefuzz import fuzz, process
 
 from app.data import loaders
@@ -65,12 +66,17 @@ def build_case(
     inputs: InputPack,
     *,
     ders: int | None = None,
+    session: Session | None = None,
 ) -> tuple[dict, dict, dict]:
     """Return (set_data, param_data, meta) for `UnitCommitmentModel`.
 
     meta keys: timestamps, precio_bolsa, CC, initial_condition_df,
     major_generators, generators, fixed_fuel_fire, pmax_new_resources,
     expansion_sources.
+
+    If *session* is provided (DB-backed worker path), the ensure_* functions
+    record each fetched dataset in the ``input_datasets`` manifest table so
+    provenance is tracked.  The CLI path passes ``None``.
     """
     DISPATCH_DATE = case.dispatch_date
     DERS = ders
@@ -78,7 +84,7 @@ def build_case(
     storage = get_storage(dd)
 
     ensure_data_for_date(DISPATCH_DATE, data_dir=dd)
-    ensure_bulk_data_for_year(DISPATCH_DATE.year, data_dir=dd)
+    ensure_bulk_data_for_year(DISPATCH_DATE.year, data_dir=dd, session=session)
 
     # --- Load root CSVs ---
     year = DISPATCH_DATE.year
@@ -103,7 +109,12 @@ def build_case(
     # --- Filter data by date ---
     dispo = dispo[(dispo.datetime.dt.date == DISPATCH_DATE) & (dispo["resource_name"].notnull())]
     dispo = dispo.drop_duplicates(subset=["resource_name", "datetime"])
-    ensure_agc_asignado(DISPATCH_DATE, dd, resource_names=list(dispo["resource_name"].unique()))
+    ensure_agc_asignado(
+        DISPATCH_DATE,
+        dd,
+        resource_names=list(dispo["resource_name"].unique()),
+        session=session,
+    )
     agc_asignado = loaders.load_agc(dd, DISPATCH_DATE)
     oferta_full = ofertas.copy()
     ofertas = ofertas[ofertas.Date.dt.date == DISPATCH_DATE]

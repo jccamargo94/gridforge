@@ -6,6 +6,7 @@ Per-case failures are isolated: one bad case does not abort the batch.
 import traceback
 
 import pandas as pd
+from sqlalchemy.orm import Session
 
 from app.data.actuals import load_actual_price
 from app.model.model import UnitCommitmentModel
@@ -24,11 +25,12 @@ def run_case(
     ders: int | None = None,
     out: str = "data/results",
     data_dir: str = "data",
+    session: Session | None = None,
 ) -> RunResult:
     t = case.level.value
     try:
         inputs = InputPack(dispatch_date=case.dispatch_date, source=input_source, data_dir=data_dir)
-        set_data, param_data, _meta = build_case(case, inputs, ders=ders)
+        set_data, param_data, _meta = build_case(case, inputs, ders=ders, session=session)
         model = UnitCommitmentModel(case=case)
         model.create_model(set_data=set_data, param_data=param_data)
         model.solve(solver=case.solver, compute_prices=case.compute_prices)
@@ -62,12 +64,13 @@ def run_many(
     cases: list[DispatchCase],
     *,
     out: str = "data/results",
+    session: Session | None = None,
     **kw,
 ) -> list[RunResult]:
     results: list[RunResult] = []
     for case in cases:
         print(f"==> {case.dispatch_date} [{case.level.value}]")
-        results.append(run_case(case, out=out, **kw))
+        results.append(run_case(case, out=out, session=session, **kw))
 
     rows = [
         {

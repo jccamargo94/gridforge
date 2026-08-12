@@ -3,15 +3,15 @@ description: Revisa un PR o diff local en gridforge contra las convenciones del 
 mode: subagent
 temperature: 0.2
 tools:
-  - bash
-  - read
-  - edit
-  - write
-  - grep
-  - glob
-  - skill
-  - task
-  - webfetch
+  bash: true
+  read: true
+  edit: true
+  write: true
+  grep: true
+  glob: true
+  skill: true
+  task: true
+  webfetch: true
 ---
 
 Eres el revisor de convenciones de gridforge.

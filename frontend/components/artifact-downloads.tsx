@@ -1,15 +1,18 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { downloadRunArtifact } from "@/lib/api-client";
 import type { RunArtifacts } from "@/lib/types";
+import { useT } from "@/lib/i18n-context";
+import { Download } from "lucide-react";
 import { useState } from "react";
 
 type ArtifactKey = keyof RunArtifacts;
 
-const ARTIFACT_LABELS: Record<ArtifactKey, string> = {
-  dispatch: "Despacho",
-  prices: "Precios",
-  bess: "BESS",
+const ARTIFACT_LABEL_KEYS: Record<ArtifactKey, string> = {
+  dispatch: "artifacts.dispatch",
+  prices: "artifacts.prices",
+  bess: "artifacts.bess",
 };
 
 export function ArtifactDownloads({
@@ -20,6 +23,7 @@ export function ArtifactDownloads({
   artifacts: RunArtifacts;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   async function handleDownload(artifact: ArtifactKey) {
     setError(null);
@@ -34,24 +38,42 @@ export function ArtifactDownloads({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      setError("No se pudo descargar el artefacto.");
+      setError(t("artifacts.downloadError"));
     }
   }
 
-  const available = (Object.keys(artifacts) as ArtifactKey[]).filter((key) => artifacts[key]);
+  const available = (Object.keys(artifacts) as ArtifactKey[]).filter(
+    (key) => artifacts[key]
+  );
 
   if (available.length === 0) {
-    return <p>No hay artefactos disponibles todavia.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("artifacts.noData")}
+      </p>
+    );
   }
 
   return (
     <div>
-      {available.map((artifact) => (
-        <button key={artifact} type="button" onClick={() => handleDownload(artifact)}>
-          Descargar {ARTIFACT_LABELS[artifact]}
-        </button>
-      ))}
-      {error && <p role="alert">{error}</p>}
+      <div className="flex flex-wrap gap-3">
+        {available.map((artifact) => (
+          <Button
+            key={artifact}
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload(artifact)}
+          >
+            <Download className="size-3.5" />
+            {t(ARTIFACT_LABEL_KEYS[artifact])}
+          </Button>
+        ))}
+      </div>
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

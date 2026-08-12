@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import { ArtifactDownloads } from "./artifact-downloads";
 
 vi.mock("@/lib/api-client", () => ({
@@ -7,6 +8,14 @@ vi.mock("@/lib/api-client", () => ({
 }));
 
 import { downloadRunArtifact } from "@/lib/api-client";
+
+function renderDownloads(runId: string, artifacts: { dispatch: boolean; prices: boolean; bess: boolean }) {
+  return render(
+    <I18nProvider>
+      <ArtifactDownloads runId={runId} artifacts={artifacts} />
+    </I18nProvider>
+  );
+}
 
 beforeEach(() => {
   vi.mocked(downloadRunArtifact).mockReset();
@@ -19,18 +28,18 @@ beforeEach(() => {
 
 describe("ArtifactDownloads", () => {
   it("shows an empty-state message when no artifacts are available", () => {
-    render(<ArtifactDownloads runId="run-1" artifacts={{ dispatch: false, prices: false, bess: false }} />);
+    renderDownloads("run-1", { dispatch: false, prices: false, bess: false });
 
     expect(screen.getByText(/no hay artefactos disponibles/i)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("renders one button per available artifact and none for unavailable ones", () => {
-    render(<ArtifactDownloads runId="run-1" artifacts={{ dispatch: true, prices: true, bess: false }} />);
+    renderDownloads("run-1", { dispatch: true, prices: true, bess: false });
 
-    expect(screen.getByRole("button", { name: /despacho/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /precios/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /bess/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /despacho csv/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /precios csv/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /bess csv/i })).not.toBeInTheDocument();
   });
 
   it("clicking a download button fetches the blob and triggers a synthetic anchor click", async () => {
@@ -38,8 +47,8 @@ describe("ArtifactDownloads", () => {
     vi.mocked(downloadRunArtifact).mockResolvedValue(fakeBlob);
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
-    render(<ArtifactDownloads runId="run-1" artifacts={{ dispatch: true, prices: false, bess: false }} />);
-    fireEvent.click(screen.getByRole("button", { name: /despacho/i }));
+    renderDownloads("run-1", { dispatch: true, prices: false, bess: false });
+    fireEvent.click(screen.getByRole("button", { name: /despacho csv/i }));
 
     await vi.waitFor(() => {
       expect(downloadRunArtifact).toHaveBeenCalledWith("run-1", "dispatch");
@@ -52,8 +61,8 @@ describe("ArtifactDownloads", () => {
   it("shows an error message when the download fails", async () => {
     vi.mocked(downloadRunArtifact).mockRejectedValue(new Error("500"));
 
-    render(<ArtifactDownloads runId="run-1" artifacts={{ dispatch: true, prices: false, bess: false }} />);
-    fireEvent.click(screen.getByRole("button", { name: /despacho/i }));
+    renderDownloads("run-1", { dispatch: true, prices: false, bess: false });
+    fireEvent.click(screen.getByRole("button", { name: /despacho csv/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo descargar/i);
   });

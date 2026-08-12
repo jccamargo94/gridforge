@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import { RunComparisonTable } from "./run-comparison-table";
 import type { RunDetail } from "@/lib/types";
 
@@ -18,6 +19,14 @@ function makeRun(overrides: Partial<RunDetail>): RunDetail {
     artifacts: { dispatch: false, prices: false, bess: false },
     ...overrides,
   };
+}
+
+function renderTable(runs: RunDetail[]) {
+  return render(
+    <I18nProvider>
+      <RunComparisonTable runs={runs} />
+    </I18nProvider>
+  );
 }
 
 describe("RunComparisonTable", () => {
@@ -39,16 +48,16 @@ describe("RunComparisonTable", () => {
         },
       }),
     ];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText("1.5")).toBeInTheDocument();
     expect(screen.getByText("1000")).toBeInTheDocument();
   });
 
   it("shows a no-metrics marker and dashes for a run with null metrics", () => {
     const runs = [makeRun({ run_id: "r2", metrics: null })];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText(/sin metricas/i)).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 
   it("renders a dash for individual null metric fields within populated metrics", () => {
@@ -69,10 +78,10 @@ describe("RunComparisonTable", () => {
         },
       }),
     ];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText("1.5")).toBeInTheDocument();
     expect(screen.getByText("1000")).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 
   it("shows metrics from one run even when another run has null metrics", () => {
@@ -97,10 +106,10 @@ describe("RunComparisonTable", () => {
         metrics: null,
       }),
     ];
-    render(<RunComparisonTable runs={runs} />);
+    renderTable(runs);
     expect(screen.getByText("1.5")).toBeInTheDocument();
     expect(screen.getByText("1000")).toBeInTheDocument();
     expect(screen.getByText(/sin metricas/i)).toBeInTheDocument();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 });

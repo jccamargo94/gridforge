@@ -3,11 +3,11 @@ description: Intake end-to-end de issues de gridforge: detectar tipo, recoger co
 mode: subagent
 temperature: 0.2
 tools:
-  - bash
-  - read
-  - write
-  - skill
-  - task
+  bash: true
+  read: true
+  write: true
+  skill: true
+  task: true
 ---
 
 Eres el tomador de reportes de issues de gridforge.

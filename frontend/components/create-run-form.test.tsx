@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import { CreateRunForm } from "./create-run-form";
 
 vi.mock("@/lib/api-client", () => ({
@@ -12,7 +14,11 @@ import { createRun } from "@/lib/api-client";
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient();
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <I18nProvider>{ui}</I18nProvider>
+    </QueryClientProvider>
+  );
 }
 
 describe("CreateRunForm", () => {
@@ -21,8 +27,7 @@ describe("CreateRunForm", () => {
     renderWithQueryClient(<CreateRunForm onCreated={onCreated} />);
 
     fireEvent.change(screen.getByLabelText(/fecha/i), { target: { value: "2024-04-18" } });
-    fireEvent.change(screen.getByLabelText(/nivel/i), { target: { value: "preideal" } });
-    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+    fireEvent.click(screen.getByRole("button", { name: /crear ejecucion/i }));
 
     await waitFor(() =>
       expect(createRun).toHaveBeenCalledWith(
@@ -36,16 +41,21 @@ describe("CreateRunForm", () => {
     renderWithQueryClient(<CreateRunForm onCreated={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/fecha/i), { target: { value: "2024-04-18" } });
-    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+    fireEvent.click(screen.getByRole("button", { name: /crear ejecucion/i }));
 
     await waitFor(() =>
       expect(createRun).toHaveBeenCalledWith(expect.objectContaining({ solver: "cbc" }))
     );
   });
 
-  it("renders the HiGHS solver option as disabled", () => {
+  it("renders the HiGHS solver option as disabled", async () => {
+    const user = userEvent.setup();
     renderWithQueryClient(<CreateRunForm onCreated={vi.fn()} />);
-    const highsOption = screen.getByRole("option", { name: /highs/i }) as HTMLOptionElement;
-    expect(highsOption.disabled).toBe(true);
+
+    const solverTrigger = screen.getByRole("combobox", { name: /solver/i });
+    await user.click(solverTrigger);
+
+    const highsItem = screen.getByRole("option", { name: /highs/i });
+    expect(highsItem).toHaveAttribute("aria-disabled", "true");
   });
 });

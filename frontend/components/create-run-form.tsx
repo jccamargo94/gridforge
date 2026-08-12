@@ -3,19 +3,32 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createRun, listScenarios } from "@/lib/api-client";
 import type { CreateRunRequest, DispatchLevel } from "@/lib/types";
+import { useT } from "@/lib/i18n-context";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-
-const SELECT_CLASS =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+import {
+  Calendar,
+  Cpu,
+  Layers,
+  Play,
+  Workflow,
+} from "lucide-react";
 
 export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
   const [dispatchDate, setDispatchDate] = useState("");
   const [level, setLevel] = useState<DispatchLevel>("preideal");
   const [solver, setSolver] = useState("cbc");
   const [scenarioId, setScenarioId] = useState("");
+  const t = useT();
 
   const scenariosQuery = useQuery({ queryKey: ["scenarios"], queryFn: listScenarios });
   const mutation = useMutation({
@@ -34,64 +47,112 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-4">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="dispatch_date">Fecha</Label>
-        <Input
-          id="dispatch_date"
-          type="date"
-          value={dispatchDate}
-          onChange={(e) => setDispatchDate(e.target.value)}
-          required
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="level">Nivel</Label>
-        <select
-          id="level"
-          value={level}
-          onChange={(e) => setLevel(e.target.value as DispatchLevel)}
-          className={SELECT_CLASS}
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="dispatch_date" className="flex items-center gap-1.5">
+            <Calendar className="size-3.5 text-muted-foreground" />
+            {t("createRun.date")}
+          </Label>
+          <Input
+            id="dispatch_date"
+            type="date"
+            value={dispatchDate}
+            onChange={(e) => setDispatchDate(e.target.value)}
+            required
+          />
+          <p className="text-[0.7rem] text-muted-foreground">
+            {t("createRun.dateHelp")}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="level" className="flex items-center gap-1.5">
+            <Layers className="size-3.5 text-muted-foreground" />
+            {t("createRun.level")}
+          </Label>
+          <Select
+            value={level}
+            onValueChange={(value) => setLevel(value as DispatchLevel)}
+          >
+            <SelectTrigger id="level">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="preideal">preideal</SelectItem>
+              <SelectItem value="ideal">ideal</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[0.7rem] text-muted-foreground">
+            {t("createRun.levelHelp")}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="solver" className="flex items-center gap-1.5">
+            <Cpu className="size-3.5 text-muted-foreground" />
+            {t("createRun.solver")}
+          </Label>
+          <Select
+            value={solver}
+            onValueChange={(value) => value && setSolver(value)}
+          >
+            <SelectTrigger id="solver">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cbc">CBC</SelectItem>
+              <SelectItem value="highs" disabled>
+                HiGHS ({t("createRun.comingSoon")})
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[0.7rem] text-muted-foreground">
+            {t("createRun.solverHelp")}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="scenario_id" className="flex items-center gap-1.5">
+            <Workflow className="size-3.5 text-muted-foreground" />
+            {t("createRun.scenario")}
+          </Label>
+          <Select
+            value={scenarioId}
+            onValueChange={(value) => value && setScenarioId(value)}
+          >
+            <SelectTrigger id="scenario_id">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">{t("createRun.none")}</SelectItem>
+              {(scenariosQuery.data ?? []).map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.penetration_level} ({s.mode})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[0.7rem] text-muted-foreground">
+            {t("createRun.scenarioHelp")}
+          </p>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={mutation.isPending}
+          className="bg-amber-500 text-black hover:bg-amber-400 w-full sm:w-auto"
         >
-          <option value="preideal">preideal</option>
-          <option value="ideal">ideal</option>
-        </select>
+          <Play className="size-3.5" />
+          {mutation.isPending ? t("createRun.creating") : t("createRun.submit")}
+        </Button>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="solver">Solver</Label>
-        <select
-          id="solver"
-          value={solver}
-          onChange={(e) => setSolver(e.target.value)}
-          className={SELECT_CLASS}
-        >
-          <option value="cbc">CBC</option>
-          <option value="highs" disabled>
-            HiGHS (proximamente)
-          </option>
-        </select>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="scenario_id">Escenario BESS (opcional)</Label>
-        <select
-          id="scenario_id"
-          value={scenarioId}
-          onChange={(e) => setScenarioId(e.target.value)}
-          className={SELECT_CLASS}
-        >
-          <option value="">Ninguno</option>
-          {(scenariosQuery.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.penetration_level} ({s.mode})
-            </option>
-          ))}
-        </select>
-      </div>
-      <Button type="submit" disabled={mutation.isPending}>
-        Crear ejecucion
-      </Button>
+
       {mutation.isError && (
-        <p role="alert" className="w-full text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-400"
+        >
           {(mutation.error as Error).message}
         </p>
       )}

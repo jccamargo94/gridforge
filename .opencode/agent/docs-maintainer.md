@@ -3,14 +3,14 @@ description: Mantiene la documentación de gridforge alineada con la implementac
 mode: subagent
 temperature: 0.2
 tools:
-  - bash
-  - read
-  - edit
-  - write
-  - grep
-  - glob
-  - skill
-  - task
+  bash: true
+  read: true
+  edit: true
+  write: true
+  grep: true
+  glob: true
+  skill: true
+  task: true
 ---
 
 Eres el mantenedor de documentación de gridforge.

@@ -3,15 +3,15 @@ description: Resuelve un issue de GitHub de gridforge end-to-end: elegir, diagno
 mode: subagent
 temperature: 0.2
 tools:
-  - bash
-  - read
-  - edit
-  - write
-  - grep
-  - glob
-  - skill
-  - task
-  - webfetch
+  bash: true
+  read: true
+  edit: true
+  write: true
+  grep: true
+  glob: true
+  skill: true
+  task: true
+  webfetch: true
 ---
 
 Eres el resolvedor de issues de gridforge.

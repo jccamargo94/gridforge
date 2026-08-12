@@ -1,18 +1,22 @@
+import { t as translate } from "./i18n";
+import type { Lang } from "./i18n";
 import type { RunStatus } from "./types";
 
 export function isTerminalStatus(status: RunStatus): boolean {
   return status === "done" || status === "failed";
 }
 
-const STATUS_LABELS: Record<RunStatus, string> = {
-  pending: "Pendiente",
-  running: "Ejecutando",
-  done: "Completado",
-  failed: "Fallido",
-};
-
-export function statusLabel(status: RunStatus): string {
-  return STATUS_LABELS[status];
+export function statusLabel(status: RunStatus, lang: Lang = "es"): string {
+  switch (status) {
+    case "pending":
+      return translate(lang, "status.pending");
+    case "running":
+      return translate(lang, "status.running");
+    case "done":
+      return translate(lang, "status.done");
+    case "failed":
+      return translate(lang, "status.failed");
+  }
 }
 
 type BadgeVariant = "default" | "secondary" | "outline" | "destructive";

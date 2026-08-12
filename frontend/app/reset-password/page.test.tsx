@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import ResetPasswordPage from "./page";
 
 const push = vi.fn();
@@ -11,13 +12,21 @@ vi.mock("@/lib/supabase", () => ({
 
 import { supabase } from "@/lib/supabase";
 
+function renderReset() {
+  return render(
+    <I18nProvider>
+      <ResetPasswordPage />
+    </I18nProvider>
+  );
+}
+
 describe("ResetPasswordPage", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("updates the password and redirects to /login on success", async () => {
     vi.mocked(supabase.auth.updateUser).mockResolvedValue({ error: null } as never);
 
-    render(<ResetPasswordPage />);
+    renderReset();
     fireEvent.change(screen.getByLabelText(/nueva contrasena/i), { target: { value: "secret123" } });
     fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
@@ -27,7 +36,7 @@ describe("ResetPasswordPage", () => {
   });
 
   it("shows an error when the passwords do not match", async () => {
-    render(<ResetPasswordPage />);
+    renderReset();
     fireEvent.change(screen.getByLabelText(/nueva contrasena/i), { target: { value: "secret123" } });
     fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "different" } });
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
@@ -41,7 +50,7 @@ describe("ResetPasswordPage", () => {
       error: { message: "Auth session missing" },
     } as never);
 
-    render(<ResetPasswordPage />);
+    renderReset();
     fireEvent.change(screen.getByLabelText(/nueva contrasena/i), { target: { value: "secret123" } });
     fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));

@@ -29,7 +29,7 @@ describe("toHourlyDispatchSeries", () => {
     expect(data).toEqual([{ hour: 0, A: 10, B: 5 }]);
   });
 
-  it("buckets everything past the top 6 (by total dispatch) into Otros", () => {
+  it("buckets everything past the top 6 (by total dispatch) into Otros (Spanish default)", () => {
     const rows: DispatchRow[] = [
       { generador: "G1", datetime: "2024-04-18 00:00:00", dispatch: 100 },
       { generador: "G2", datetime: "2024-04-18 00:00:00", dispatch: 90 },
@@ -46,5 +46,23 @@ describe("toHourlyDispatchSeries", () => {
     expect(seriesKeys).toEqual(["G1", "G2", "G3", "G4", "G5", "G6", "Otros"]);
     expect(data[0].Otros).toBe(8);
     expect(data[0].G7).toBeUndefined();
+  });
+
+  it("uses 'Others' label when lang=en", () => {
+    const rows: DispatchRow[] = [
+      { generador: "G1", datetime: "2024-04-18 00:00:00", dispatch: 100 },
+      { generador: "G2", datetime: "2024-04-18 00:00:00", dispatch: 90 },
+      { generador: "G3", datetime: "2024-04-18 00:00:00", dispatch: 80 },
+      { generador: "G4", datetime: "2024-04-18 00:00:00", dispatch: 70 },
+      { generador: "G5", datetime: "2024-04-18 00:00:00", dispatch: 60 },
+      { generador: "G6", datetime: "2024-04-18 00:00:00", dispatch: 50 },
+      { generador: "G7", datetime: "2024-04-18 00:00:00", dispatch: 5 },
+      { generador: "G8", datetime: "2024-04-18 00:00:00", dispatch: 3 },
+    ];
+
+    const { seriesKeys, data } = toHourlyDispatchSeries(rows, "en");
+
+    expect(seriesKeys).toEqual(["G1", "G2", "G3", "G4", "G5", "G6", "Others"]);
+    expect(data[0].Others).toBe(8);
   });
 });

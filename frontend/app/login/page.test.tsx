@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import LoginPage from "./page";
 
 const push = vi.fn();
@@ -11,6 +12,14 @@ vi.mock("@/lib/supabase", () => ({
 
 import { supabase } from "@/lib/supabase";
 
+function renderLogin() {
+  return render(
+    <I18nProvider>
+      <LoginPage />
+    </I18nProvider>
+  );
+}
+
 describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -19,7 +28,7 @@ describe("LoginPage", () => {
   it("signs in and redirects to /runs on success", async () => {
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({ error: null } as never);
 
-    render(<LoginPage />);
+    renderLogin();
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText(/contrase/i), { target: { value: "secret123" } });
     fireEvent.click(screen.getByRole("button", { name: /entrar/i }));
@@ -32,7 +41,7 @@ describe("LoginPage", () => {
       error: { message: "Invalid login credentials" },
     } as never);
 
-    render(<LoginPage />);
+    renderLogin();
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText(/contrase/i), { target: { value: "wrong" } });
     fireEvent.click(screen.getByRole("button", { name: /entrar/i }));
@@ -46,7 +55,7 @@ describe("LoginPage", () => {
       error: null,
     } as never);
 
-    render(<LoginPage />);
+    renderLogin();
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
     fireEvent.click(screen.getByRole("button", { name: /olvidaste tu contrasena/i }));
 
@@ -60,7 +69,7 @@ describe("LoginPage", () => {
   });
 
   it("shows a validation message when requesting a reset with no email", async () => {
-    render(<LoginPage />);
+    renderLogin();
     fireEvent.click(screen.getByRole("button", { name: /olvidaste tu contrasena/i }));
 
     await waitFor(() => screen.getByText(/ingresa tu correo/i));
@@ -68,7 +77,7 @@ describe("LoginPage", () => {
   });
 
   it("links to /signup", () => {
-    render(<LoginPage />);
+    renderLogin();
     expect(screen.getByRole("link", { name: /crear cuenta/i })).toHaveAttribute("href", "/signup");
   });
 });

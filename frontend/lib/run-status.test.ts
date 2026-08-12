@@ -16,9 +16,16 @@ describe("isTerminalStatus", () => {
 describe("statusLabel", () => {
   it("returns the Spanish label for each status", () => {
     expect(statusLabel("pending")).toBe("Pendiente");
-    expect(statusLabel("running")).toBe("Ejecutando");
+    expect(statusLabel("running")).toBe("En ejecucion");
     expect(statusLabel("done")).toBe("Completado");
     expect(statusLabel("failed")).toBe("Fallido");
+  });
+
+  it("returns the English label when lang=en", () => {
+    expect(statusLabel("pending", "en")).toBe("Pending");
+    expect(statusLabel("running", "en")).toBe("Running");
+    expect(statusLabel("done", "en")).toBe("Done");
+    expect(statusLabel("failed", "en")).toBe("Failed");
   });
 });
 

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/lib/i18n-context";
 import SignupPage from "./page";
 
 const push = vi.fn();
@@ -11,12 +12,20 @@ vi.mock("@/lib/supabase", () => ({
 
 import { supabase } from "@/lib/supabase";
 
+function renderSignup() {
+  return render(
+    <I18nProvider>
+      <SignupPage />
+    </I18nProvider>
+  );
+}
+
 describe("SignupPage", () => {
   beforeEach(() => vi.clearAllMocks());
   it("signs up and redirects to /login on success", async () => {
     vi.mocked(supabase.auth.signUp).mockResolvedValue({ error: null } as never);
 
-    render(<SignupPage />);
+    renderSignup();
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText("Contrasena"), { target: { value: "secret123" } });
     fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "secret123" } });
@@ -26,7 +35,7 @@ describe("SignupPage", () => {
   });
 
   it("shows an error when the passwords do not match", async () => {
-    render(<SignupPage />);
+    renderSignup();
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "a@b.com" } });
     fireEvent.change(screen.getByLabelText("Contrasena"), { target: { value: "secret123" } });
     fireEvent.change(screen.getByLabelText(/confirmar contrasena/i), { target: { value: "different" } });
@@ -37,7 +46,7 @@ describe("SignupPage", () => {
   });
 
   it("links to /login", () => {
-    render(<SignupPage />);
+    renderSignup();
     expect(screen.getByRole("link", { name: /iniciar sesion/i })).toHaveAttribute("href", "/login");
   });
 });

@@ -3,9 +3,11 @@
 import { ArtifactDownloads } from "@/components/artifact-downloads";
 import { DispatchChart } from "@/components/dispatch-chart";
 import { LogViewer } from "@/components/log-viewer";
+import { MarginalPlantsTable } from "@/components/marginal-plants-table";
+import { PriceSeriesChart } from "@/components/price-series-chart";
 import { formatBogotaTime } from "@/lib/format-date";
 import { useRunDetail } from "@/hooks/use-run-detail";
-import { getRunDispatch } from "@/lib/api-client";
+import { getRunDispatch, getRunMarginalPlants } from "@/lib/api-client";
 import { statusLabel } from "@/lib/run-status";
 import { useLang, useT } from "@/lib/i18n-context";
 import { useQuery } from "@tanstack/react-query";
@@ -41,6 +43,11 @@ function formatMetric(value: number | null, decimals = 2): string {
   return value.toFixed(decimals);
 }
 
+function formatPercent(value: number | null, decimals = 2): string {
+  if (value === null) return "\u2014";
+  return (value * 100).toFixed(decimals);
+}
+
 export default function RunDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading } = useRunDetail(id);
@@ -51,6 +58,12 @@ export default function RunDetailPage() {
     queryKey: ["run-dispatch", id],
     queryFn: () => getRunDispatch(id),
     enabled: Boolean(data?.artifacts.dispatch),
+  });
+
+  const marginalPlantsQuery = useQuery({
+    queryKey: ["run-marginal-plants", id],
+    queryFn: () => getRunMarginalPlants(id),
+    enabled: Boolean(data?.artifacts.marginal_plants),
   });
 
   if (isLoading || !data) {
@@ -114,25 +127,49 @@ export default function RunDetailPage() {
           <MetricCard
             label={t("runDetail.rmse")}
             value={formatMetric(data.metrics.rmse)}
-            unit="MW"
+            unit={t("runDetail.copMwh")}
             icon={Activity}
           />
           <MetricCard
             label={t("runDetail.mae")}
             value={formatMetric(data.metrics.mae)}
-            unit="MW"
+            unit={t("runDetail.copMwh")}
             icon={BarChart3}
           />
           <MetricCard
             label={t("runDetail.bias")}
             value={formatMetric(data.metrics.bias)}
-            unit="MW"
+            unit={t("runDetail.copMwh")}
+            icon={TrendingDown}
+          />
+          <MetricCard
+            label={t("runDetail.wape")}
+            value={formatPercent(data.metrics.wape)}
+            unit="%"
+            icon={TrendingDown}
+          />
+          <MetricCard
+            label={t("runDetail.smape")}
+            value={formatPercent(data.metrics.smape)}
+            unit="%"
             icon={TrendingDown}
           />
           <MetricCard
             label={t("runDetail.r2")}
             value={formatMetric(data.metrics.r2, 4)}
             icon={TrendingUp}
+          />
+          <MetricCard
+            label={t("runDetail.dispatchMae")}
+            value={formatMetric(data.metrics.dispatch_mae_mw)}
+            unit={t("chart.mw")}
+            icon={Activity}
+          />
+          <MetricCard
+            label={t("runDetail.dispatchRms")}
+            value={formatMetric(data.metrics.dispatch_rmse_mw)}
+            unit={t("chart.mw")}
+            icon={BarChart3}
           />
           {data.metrics.bess_charge_mwh !== null && (
             <MetricCard
@@ -169,6 +206,33 @@ export default function RunDetailPage() {
           <DispatchChart rows={dispatchQuery.data ?? []} lang={lang} />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("runDetail.pricesChart")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PriceSeriesChart points={data.price_series} />
+        </CardContent>
+      </Card>
+
+      {data.artifacts.marginal_plants && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("runDetail.marginalPlants")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {marginalPlantsQuery.isLoading ? (
+              <div className="flex items-center gap-3 py-12 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                {t("runDetail.loading")}
+              </div>
+            ) : (
+              <MarginalPlantsTable rows={marginalPlantsQuery.data ?? []} />
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

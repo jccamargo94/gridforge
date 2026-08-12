@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
+from app.data.actuals import load_actual_price
 from app.db import queries
 from app.db.session import get_engine, get_sessionmaker
 from app.schemas import BessScenario, DispatchLevel
@@ -90,6 +91,40 @@ def _run_summary(run, case) -> dict:
     }
 
 
+def _price_comparison_df(run, case) -> pd.DataFrame | None:
+    """Model MPO (from run.price_path) aligned with XM MPO (iMAR), sorted by
+    datetime, truncated to the shorter series. None when either source is
+    missing or unparseable."""
+    if run.price_path is None:
+        return None
+    storage = get_storage(".")
+    if not storage.exists(run.price_path):
+        return None
+    try:
+        with storage.open(run.price_path) as f:
+            df = pd.read_csv(f, parse_dates=["datetime"])
+        xm = load_actual_price(case.dispatch_date, data_dir="data")
+    except (FileNotFoundError, ValueError):
+        return None
+    df = df.sort_values("datetime")
+    model_mpo = df["ideal_marginal_price"].astype(float).tolist()
+    n = min(len(model_mpo), len(xm))
+    return pd.DataFrame(
+        {
+            "datetime": [str(dt) for dt in df["datetime"].tolist()[:n]],
+            "model_mpo": model_mpo[:n],
+            "xm_mpo": [float(x) for x in xm[:n]],
+        }
+    )
+
+
+def _price_series(run, case) -> list[dict] | None:
+    df = _price_comparison_df(run, case)
+    if df is None:
+        return None
+    return df.to_dict(orient="records")
+
+
 def _get_owned_run(session, run_id: str, user_id: str):
     run = queries.get_run(session, run_id)
     if run is None or run.user_id != user_id:
@@ -143,6 +178,8 @@ def get_run_detail(
             "bess_discharge_mwh": metric_set.bess_discharge_mwh,
             "bess_avg_soc_mwh": metric_set.bess_avg_soc_mwh,
             "bess_net_revenue": metric_set.bess_net_revenue,
+            "dispatch_mae_mw": metric_set.dispatch_mae_mw,
+            "dispatch_rmse_mw": metric_set.dispatch_rmse_mw,
         }
         if metric_set
         else None
@@ -151,7 +188,9 @@ def get_run_detail(
         "dispatch": run.dispatch_path is not None,
         "prices": run.price_path is not None,
         "bess": run.bess_path is not None,
+        "marginal_plants": run.marginal_plants_path is not None,
     }
+    out["price_series"] = _price_series(run, case)
     return out
 
 
@@ -171,6 +210,7 @@ _ARTIFACT_PATHS = {
     "dispatch": "dispatch_path",
     "prices": "price_path",
     "bess": "bess_path",
+    "marginal_plants": "marginal_plants_path",
 }
 
 
@@ -197,6 +237,24 @@ def get_run_artifact(
     with get_storage(".").open(path) as f:
         df = pd.read_csv(f)
     return df.to_dict(orient="records")
+
+
+@app.get("/runs/{run_id}/download/price_comparison")
+def download_price_comparison(
+    run_id: str,
+    user_id: str = Depends(get_current_user_id),
+    session=Depends(get_session),
+):
+    run = _get_owned_run(session, run_id, user_id)
+    case = queries.get_case(session, run.case_id)
+    df = _price_comparison_df(run, case)
+    if df is None:
+        raise HTTPException(status_code=404, detail="price data not available")
+    return PlainTextResponse(
+        df.to_csv(index=False),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=price_comparison.csv"},
+    )
 
 
 @app.get("/runs/{run_id}/download/{artifact}")

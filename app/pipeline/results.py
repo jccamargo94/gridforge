@@ -28,6 +28,26 @@ def extract_dispatch(model) -> pd.DataFrame:
     )
 
 
+def extract_marginal_plants(model) -> pd.DataFrame:
+    """One row per (generator, time period) with its dispatch, Pmax and whether
+    the unit is marginal at that instant: `0 < pout < Pmax` (tolerance 1e-6).
+    Every (g, t) appears, not just the marginal ones."""
+    rows = []
+    for (g, t), v in model._model.pout.items():
+        dispatch = pyo.value(v)
+        pmax = pyo.value(model._model.Pmax[g, t])
+        rows.append(
+            {
+                "datetime": t,
+                "generador": g,
+                "dispatch": dispatch,
+                "pmax": pmax,
+                "is_marginal": bool(1e-6 < dispatch < pmax - 1e-6),
+            }
+        )
+    return pd.DataFrame(rows, columns=["datetime", "generador", "dispatch", "pmax", "is_marginal"])
+
+
 def extract_bess(model, mpo: dict) -> pd.DataFrame:
     """Per-unit x hour BESS activity, settled at the system marginal price
     (MPO), not at the unit's own bid: the bid is an optimization input, and
@@ -92,6 +112,11 @@ def save_results(model, case: DispatchCase, out: str = "data/results") -> RunRes
         bess_path = f"{out}/{bess_name}"
         bess_summary = _bess_summary(bess_df)
 
+    marginal_plants = extract_marginal_plants(model)
+    marginal_name = f"marginal_plants-{case.dispatch_date}-{t}.csv"
+    with storage.open(marginal_name, "w") as f:
+        marginal_plants.to_csv(f, sep=",", index=False)
+
     return RunResult(
         case=case,
         ok=True,
@@ -99,4 +124,5 @@ def save_results(model, case: DispatchCase, out: str = "data/results") -> RunRes
         price_path=f"{out}/{price_name}",
         bess_path=bess_path,
         bess_summary=bess_summary,
+        marginal_plants_path=f"{out}/{marginal_name}",
     )

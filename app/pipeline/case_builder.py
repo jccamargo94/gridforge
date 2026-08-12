@@ -327,7 +327,10 @@ def build_case(
 
     major_generators = ofertas.resource_name.unique()
     generators = dispo.resource_name.unique()
-    timestamps = demanda["datetime"].to_dict().values()
+    if case.level == DispatchLevel.preideal:
+        timestamps = list(pd.date_range(DISPATCH_DATE, periods=24, freq="1h"))
+    else:
+        timestamps = demanda["datetime"].to_dict().values()
     fuel_generators = dispo[
         (dispo["resource_name"].isin(major_generators)) & (dispo["gen_type"] == "TERMICA")
     ].resource_name.unique()
@@ -412,7 +415,7 @@ def build_case(
     prid_path = resolve_input("PrId", DISPATCH_DATE, dd)
     demand_pronos = pd.read_csv(prid_path, header=None, encoding="latin1")
     demand_pronos = demand_pronos.iloc[:, 1:].sum().values
-    demand_pronos = dict(zip(demanda["datetime"], demand_pronos))
+    demand_pronos = dict(zip(timestamps, demand_pronos))
 
     Ton = initial_condition_df.set_index(["Recurso"]).query("Recurso in @gen_on")["T_CONF_Pini-1"]
     Ton = Ton[Ton.index.isin(fuel_generators)]

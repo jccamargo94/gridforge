@@ -1,17 +1,29 @@
-# gridforge — modelo academico de despacho electrico colombiano
+# GridForge — modelo académico de despacho eléctrico colombiano
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 [![Docs](https://img.shields.io/badge/docs-github%20pages-informational.svg)](https://jccamargo94.github.io/gridforge/)
+[![Tests](https://img.shields.io/badge/tests-228%20passed-green.svg)](tests/)
 
-Repositorio academico para aproximar el despacho electrico colombiano, comparar
-resultados contra informacion publicada por XM y estudiar el efecto de incorporar
-BESS (Battery Energy Storage Systems) bajo distintos modos de participacion.
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="GridForge logo" width="120" height="120">
+</p>
+
+Modelo académico de **unit commitment** en Pyomo que aproxima el despacho
+eléctrico colombiano, reproduce el **precio de bolsa** publicado por
+[XM](https://www.xm.com.co/) (predespacho ideal y despacho ideal) y estudia el
+efecto de incorporar **BESS** (Battery Energy Storage Systems) bajo distintos
+modos de participación.
+
+Se distribuye como librería Python + CLI Typer, con backend FastAPI, worker de
+ejecución por polling y frontend Next.js, todo dockerizado para desarrollo y
+operación reproducibles.
 
 Este README es el punto de entrada para humanos y agentes de IA. Antes de hacer
 cambios, lea especialmente las secciones de estado actual, datos requeridos y
-brechas conocidas. La documentación pública del proyecto vive también en
-[docs/index.md](docs/index.md) y está preparada para GitHub Pages.
+brechas conocidas. La documentación pública del proyecto vive en
+[docs/index.md](docs/index.md) y se publica en
+[GitHub Pages](https://jccamargo94.github.io/gridforge/).
 
 ## English summary
 
@@ -204,13 +216,17 @@ get_date_results.py # runner legado batch
 notebooks/*.ipynb   # notebooks exploratorios y ETL no migrado
 
 docs/
-  index.md                        # landing page del sitio (GitHub Pages, Jekyll)
-  formulacion-matematica.md       # formulacion matematica publicada
+  index.md                        # landing page del sitio (GitHub Pages, Jekyll, con branding GridForge)
+  formulacion-matematica.md       # formulacion matematica publicada (preideal/ideal, BESS, precio marginal)
   roadmap-aplicacion-despacho.md  # vision y fases hacia app dockerizada
+  _config.yml                     # config Jekyll del sitio (baseurl /gridforge)
+  _layouts/                       # layout HTML con header/footer de marca
+  _includes/                      # header/footer reutilizables
+  assets/                         # logo.svg y main.css del sitio
   superpowers/specs/              # diseno de la CLI actual
   superpowers/plans/              # plan de implementacion de la CLI actual
 
-.github/workflows/pages.yml  # publica docs/ a GitHub Pages en push a main/develop
+.github/workflows/pages.yml  # publica docs/ a GitHub Pages (Jekyll) en push a develop
 
 tests/               # suite pytest
 data/                # insumos y resultados; git-ignored
@@ -494,6 +510,7 @@ Por cada `(fecha, tipo)` se escriben archivos en `data/results/`:
 dispatch_by_gen-{date}-{type}.csv
 marginal_price-{date}-{type}.csv
 metrics-{date}-{type}.csv
+marginal_plants-{date}-{type}.csv
 ```
 
 Cuando hay evaluacion, tambien se genera:
@@ -503,6 +520,28 @@ data/results/metrics-summary.csv
 ```
 
 El resumen incluye metricas como RMSE, MAE, bias, WAPE, sMAPE y R2.
+
+### Referencia de comparacion por nivel
+
+- **Preideal**: el precio marginal del modelo se compara contra el **MPO del
+  predespacho ideal** (archivo iMAR).
+- **Ideal**: se compara contra el **precio de bolsa real** (PrecBolsNaci, archivo
+  `precio_bolsa_{year}.csv`), con el MPO de iMAR como referencia secundaria.
+
+### Resultados del modo ideal (2026)
+
+Corridas de validacion del despacho ideal contra el precio de bolsa real:
+
+| Fecha | Referencia | RMSE precio (COP/MWh) | MAE precio (COP/MWh) | MAE despacho (MW) |
+|---|---|---|---|---|
+| 2026-02-10 | Bolsa real | 114,227 | 44,961 | 10.3 |
+| 2026-05-15 | Bolsa real | 43,435 | 26,636 | 10.8 |
+| 2026-08-02 | Bolsa real | 299,640 | 284,340 | 8.8 |
+| 2026-08-11 | MPO iMAR* | 970,462 | 970,023 | 16.5 |
+
+*La bolsa real de 2026-08-11 aun no esta publicada; la corrida uso demanda y
+disponibilidad pronosticadas (fallback con advertencia) y se comparo contra el
+MPO de iMAR.
 
 Para escenarios BESS, una brecha actual es guardar de forma mas completa carga,
 descarga, SOC, costos/ingresos y remuneracion. Hoy el pipeline guarda el

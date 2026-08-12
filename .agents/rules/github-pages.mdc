@@ -5,11 +5,37 @@ aalwaysApply: true
 
 # GitHub Pages site
 
-The repository contains a static documentation site under docs/ and a workflow to publish it through GitHub Pages.
+The repository contains a static Jekyll documentation site under `docs/` and a
+workflow (`.github/workflows/pages.yml`) that publishes it to GitHub Pages.
+
+## How it works
+
+- Jekyll builds from `./docs` (source) to `./_site` (destination) using
+  `actions/jekyll-build-pages`, then deploys via `actions/deploy-pages`.
+- The workflow triggers **only on pushes to `develop`** (the integration branch
+  and source of truth for `docs/`). `main` historically carried a stale
+  `docs/_config.yml` (baseurl `/despacho-udea`, old branding) that published a
+  broken site — do not re-add `main` to the trigger without syncing `main/docs`
+  first (see the promote-develop-to-main chore).
+- `baseurl` is `/gridforge`; the site lives at
+  https://jccamargo94.github.io/gridforge/.
+- The site uses the GridForge brand: `docs/assets/logo.svg` + `assets/main.css`,
+  `_layouts/default.html` and `_includes/{header,footer}.html`. Keep this
+  branding on any page you add or edit.
 
 ## Expectations
 
-- Keep docs/index.html as the landing page and ensure it links to the main docs pages.
-- Add or update a page under docs/ whenever a user-facing capability, workflow, or mathematical formulation changes.
-- Keep the site self-contained and avoid referencing unpublished features as if they were already implemented.
-- When the deployment workflow changes, verify that docs/ is still the publish path.
+- Keep `docs/index.md` as the landing page with `layout: default` front matter,
+  and ensure it links to the main docs pages.
+- Every page under `docs/` needs front matter `title` + `layout: default`
+  (Jekyll renders pages without a layout as bare markdown, missing the brand
+  header/footer).
+- Add or update a page under `docs/` whenever a user-facing capability, workflow,
+  or mathematical formulation changes.
+- Keep the site self-contained and avoid referencing unpublished features as if
+  they were already implemented.
+- Validate the build locally before pushing:
+  `docker run --rm -v "$PWD/docs:/site" -w /site ruby:3.3 bash -c "gem install jekyll --no-document >/dev/null && jekyll build --baseurl /gridforge"`.
+  `docs/_site/` is git-ignored.
+- When the deployment workflow changes, verify that `docs/` is still the publish
+  path and the baseurl/`relative_url` links still resolve.

@@ -50,7 +50,7 @@ def process_once(
 
     log_buffer = io.StringIO()
     with contextlib.redirect_stdout(log_buffer), contextlib.redirect_stderr(log_buffer):
-        result = run_case(case, evaluate=True, out=out_dir, data_dir=data_dir)
+        result = run_case(case, evaluate=True, out=out_dir, data_dir=data_dir, session=session)
 
     log_path = f"{out_dir}/run.log"
     with contextlib.suppress(OSError):

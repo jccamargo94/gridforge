@@ -7,13 +7,28 @@ import { useT } from "@/lib/i18n-context";
 import { Download } from "lucide-react";
 import { useState } from "react";
 
-type ArtifactKey = keyof RunArtifacts;
+type ArtifactKey = "dispatch" | "prices" | "bess" | "marginal_plants" | "price_comparison";
 
 const ARTIFACT_LABEL_KEYS: Record<ArtifactKey, string> = {
   dispatch: "artifacts.dispatch",
   prices: "artifacts.prices",
   bess: "artifacts.bess",
+  marginal_plants: "artifacts.marginalPlants",
+  price_comparison: "artifacts.priceComparison",
 };
+
+const ALL_ARTIFACTS: ArtifactKey[] = [
+  "dispatch",
+  "prices",
+  "bess",
+  "marginal_plants",
+  "price_comparison",
+];
+
+function isAvailable(key: ArtifactKey, artifacts: RunArtifacts): boolean {
+  if (key === "price_comparison") return artifacts.prices;
+  return artifacts[key];
+}
 
 export function ArtifactDownloads({
   runId,
@@ -42,9 +57,7 @@ export function ArtifactDownloads({
     }
   }
 
-  const available = (Object.keys(artifacts) as ArtifactKey[]).filter(
-    (key) => artifacts[key]
-  );
+  const available = ALL_ARTIFACTS.filter((key) => isAvailable(key, artifacts));
 
   if (available.length === 0) {
     return (

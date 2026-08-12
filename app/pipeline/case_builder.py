@@ -135,12 +135,36 @@ def build_case(
     demanda = demanda[demanda["datetime"].dt.date == DISPATCH_DATE]
     precio_bolsa = precio_bolsa[precio_bolsa["datetime"].dt.date == DISPATCH_DATE]
 
+    # ideal depends on real commercial demand (demaCome) and real commercial
+    # availability (dispo_come), which XM publishes with a ~3-day calendar lag
+    # (same-month lag family as PrecOferDesp). For recent dates (e.g. today
+    # minus 0-2 days) both can be empty: demaCome -> fall back to the PrId
+    # forecast (the same demand_pronos the preideal case uses), dispo_come ->
+    # fall back to the declared availability (dispo_declarada). Warn loudly:
+    # the user must know the run used a forecast, not the real value.
+    demand_fallback_prid = case.level == DispatchLevel.ideal and demanda.empty
+    if demand_fallback_prid:
+        print(
+            f"WARNING: DemaCome (demanda comercial real) no publicada para "
+            f"{DISPATCH_DATE} (rezago ~3 dias). Se usará el pronóstico PrId "
+            "(demand_pronos, el mismo del caso preideal) como demanda del caso ideal."
+        )
+
     if case.level == DispatchLevel.ideal:
         dispo_come = dispo_come[
             (dispo_come.datetime.dt.date == DISPATCH_DATE) & (dispo_come["resource_name"].notnull())
         ]
         dispo_come = dispo_come.drop_duplicates(subset=["resource_name", "datetime"])
+        dispo_come_empty = dispo_come.empty
+        if dispo_come_empty:
+            print(
+                f"WARNING: DispoCome (disponibilidad comercial real) no publicada para "
+                f"{DISPATCH_DATE} (rezago ~3 dias). Se usará la disponibilidad declarada "
+                f"(dispo_declarada) como Pmax del caso ideal."
+            )
         for gen in dispo["resource_name"].unique():
+            if dispo_come_empty:
+                break
             if gen in dispo_come["resource_name"].unique():
                 serie = dispo_come[(dispo_come["resource_name"] == gen)]
                 serie = (
@@ -327,7 +351,7 @@ def build_case(
 
     major_generators = ofertas.resource_name.unique()
     generators = dispo.resource_name.unique()
-    if case.level == DispatchLevel.preideal:
+    if case.level == DispatchLevel.preideal or demand_fallback_prid:
         timestamps = list(pd.date_range(DISPATCH_DATE, periods=24, freq="1h"))
     else:
         timestamps = demanda["datetime"].to_dict().values()
@@ -476,7 +500,7 @@ def build_case(
 
     DEMANDA = (
         demand_pronos
-        if case.level == DispatchLevel.preideal
+        if (case.level == DispatchLevel.preideal or demand_fallback_prid)
         else (demanda.set_index("datetime")["dema"] * 1e-3).astype(int)
     )
     MAX_MIN_OP = 1 if case.level == DispatchLevel.preideal else 0

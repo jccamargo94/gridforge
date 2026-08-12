@@ -5,6 +5,7 @@ from datetime import date
 import numpy as np
 
 from app.data.heuristic.biddings import parse_mpo, parse_predespacho
+from app.data.loaders import load_precio_bolsa
 from app.data.paths import resolve_input
 
 
@@ -15,6 +16,31 @@ def load_actual_price(dispatch_date: date, data_dir: str = "data") -> np.ndarray
     with open(path, encoding="latin1") as f:
         raw = f.read()
     return np.array(parse_mpo(raw))
+
+
+def load_actual_bolsa(dispatch_date: date, data_dir: str = "data") -> np.ndarray:
+    """XM real national bolsa price (PrecBolsNaci) for the date as a 24-length
+    float array (COP/MWh), read from the year-level precio_bolsa CSV."""
+    df = load_precio_bolsa(data_dir, dispatch_date.year)
+    sub = df[df["datetime"].dt.date == dispatch_date].sort_values("datetime")
+    if sub.empty:
+        raise ValueError(f"precio de bolsa real (PrecBolsNaci) no publicada para {dispatch_date}")
+    return sub["precio_bolsa"].astype(float).to_numpy()
+
+
+def load_reference_price(dispatch_date: date, level: str, data_dir: str = "data") -> np.ndarray:
+    """Pick the evaluation reference for a run.
+
+    ideal -> real bolsa price (PrecBolsNaci), the value the ideal dispatch
+    actually determines; falls back to the iMAR MPO when the bolsa price is not
+    published yet (same calendar lag as demaCome). preideal -> iMAR MPO.
+    """
+    if level == "ideal":
+        try:
+            return load_actual_bolsa(dispatch_date, data_dir=data_dir)
+        except (FileNotFoundError, ValueError):
+            return load_actual_price(dispatch_date, data_dir=data_dir)
+    return load_actual_price(dispatch_date, data_dir=data_dir)
 
 
 def load_actual_dispatch(dispatch_date: date, data_dir: str = "data") -> dict[str, list[float]]:

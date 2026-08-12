@@ -8,7 +8,7 @@ from datetime import date
 
 import pandas as pd
 
-from app.data.actuals import load_actual_price
+from app.data.actuals import load_reference_price
 from app.schemas import DispatchLevel
 from app.storage import get_storage
 from app.utils.metrics import price_metrics
@@ -56,7 +56,7 @@ def evaluate_saved_run(
         price_df = pd.read_csv(f, parse_dates=["datetime"]).sort_values("datetime")
     model_mpo = price_df["ideal_marginal_price"].to_numpy()
 
-    xm = load_actual_price(dispatch_date, data_dir=data_dir)
+    xm = load_reference_price(dispatch_date, level=level.value, data_dir=data_dir)
     n = min(len(xm), len(model_mpo))
     metrics = price_metrics(xm[:n], model_mpo[:n])
 

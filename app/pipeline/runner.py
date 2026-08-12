@@ -8,7 +8,7 @@ import traceback
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from app.data.actuals import load_actual_dispatch, load_actual_price
+from app.data.actuals import load_actual_dispatch, load_reference_price
 from app.data.heuristic.biddings import _match_resource_name
 from app.model.model import UnitCommitmentModel
 from app.pipeline.case_builder import build_case
@@ -39,7 +39,9 @@ def run_case(
 
         if evaluate:
             try:
-                xm = load_actual_price(case.dispatch_date, data_dir=data_dir)
+                xm = load_reference_price(
+                    case.dispatch_date, level=case.level.value, data_dir=data_dir
+                )
                 model_mpo = extract_mpo_sorted(model)
                 n = min(len(xm), len(model_mpo))
                 metrics = price_metrics(xm[:n], model_mpo[:n])

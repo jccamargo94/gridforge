@@ -1,7 +1,8 @@
 from datetime import date
 from pathlib import Path
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db import queries
@@ -89,3 +90,60 @@ def test_process_once_marks_run_failed_when_run_case_reports_failure(tmp_path, m
     assert updated.status == "failed"
     assert updated.error == "boom"
     assert updated.log_path is not None
+
+
+def test_process_once_marks_run_failed_when_run_case_raises(tmp_path, monkeypatch):
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+
+    def _raise(*a, **kw):
+        raise RuntimeError("solver exploded")
+
+    monkeypatch.setattr("services.worker.main.run_case", _raise)
+
+    processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "failed"
+    assert updated.error is not None
+    assert "solver exploded" in updated.error
+
+
+def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, monkeypatch):
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+
+    def _raise_db_error(*a, **kw):
+        # Poison the session with a statement error, then surface a
+        # SQLAlchemyError, mirroring a DB failure escaping from run_case.
+        try:
+            kw["session"].execute(text("SELECT * FROM no_such_table"))
+        except SQLAlchemyError:
+            pass
+        raise SQLAlchemyError("db exploded")
+
+    monkeypatch.setattr("services.worker.main.run_case", _raise_db_error)
+
+    processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "failed"
+    assert updated.error is not None

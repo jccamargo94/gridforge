@@ -1,10 +1,12 @@
 from datetime import date
 
+import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import queries
-from app.db.models import Base
+from app.db.models import Base, Run
 from app.schemas import (
     BessMode,
     BessScenario,
@@ -173,6 +175,35 @@ def test_finish_run_failed_sets_error():
         user_id="user-1",
     )
     queries.finish_run_failed(session, run, "boom")
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "failed"
+    assert updated.error == "boom"
+
+
+def test_finish_run_failed_recovers_aborted_transaction():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    # Leave the session in a broken, rollback-required state -- the SQLAlchemy
+    # analogue of Postgres's "current transaction is aborted"
+    # (InFailedSqlTransaction) that a DB error inside run_case produces. A plain
+    # `session.execute(text("SELECT * FROM no_such_table"))` does NOT reproduce
+    # this on SQLite: its driver keeps the transaction usable after a statement
+    # error, so such a test would pass even without the rollback fix. A failed
+    # flush does reproduce it, raising PendingRollbackError on any later commit.
+    session.add(Run())
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+    queries.finish_run_failed(session, run, "boom")
+
     updated = queries.get_run(session, run.id)
     assert updated.status == "failed"
     assert updated.error == "boom"

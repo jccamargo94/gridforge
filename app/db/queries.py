@@ -105,10 +105,20 @@ def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -
     session.commit()
 
 
-def finish_run_failed(session: Session, run: Run, error: str) -> None:
+def finish_run_failed(session: Session, run: Run, error: str, log_path: str | None = None) -> None:
+    # Clear any aborted transaction before mutating `run`. A DB error inside
+    # run_case (e.g. upsert_input_dataset hitting a missing table) leaves the
+    # session in Postgres's "current transaction is aborted" state; without this
+    # rollback the commit below would raise InFailedSqlTransaction and the worker
+    # would never record the failure. rollback() expires uncommitted attribute
+    # changes, so callers pass log_path in (applied after this rollback) instead
+    # of relying on an in-memory `run.log_path = ...` made before the call.
+    session.rollback()
     run.status = "failed"
     run.finished_at = datetime.now(timezone.utc)
     run.error = error
+    if log_path is not None:
+        run.log_path = log_path
     session.add(run)
     session.commit()
 

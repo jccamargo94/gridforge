@@ -1,0 +1,25 @@
+# GridForge — GitHub Pages configuration
+#
+# Static documentation site for the GridForge dispatch modeler.
+# Published via .github/workflows/pages.yml (Jekyll build from ./docs).
+
+title: GridForge
+description: "Modelo académico de despacho eléctrico colombiano (Pyomo, unit commitment) validado contra datos de XM, con soporte para escenarios BESS."
+url: "https://jccamargo94.github.io"
+baseurl: "/gridforge"
+author: "GridForge"
+
+# Build settings
+markdown: kramdown
+kramdown:
+  auto_ids: true
+  input: GFM
+  hard_wrap: false
+  entity_output: as_char
+  toc_levels: 1..6
+  syntax_highlighter: rouge
+
+# GitHub Pages defaults
+github: [metadata]
+
+# MathJax is loaded in the head (see _includes/head.html); no plugin needed.

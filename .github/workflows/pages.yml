@@ -1,8 +1,12 @@
 name: Deploy GitHub Pages
 
+# Deploy only from `develop`: it is the source of truth for docs/ and the repo's
+# integration branch. `main` still carries a stale docs/_config.yml (baseurl
+# "/despacho-udea", old theme/branding) that would publish a broken site if a
+# push to main deployed before the next promote-develop-to-main sync.
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
   workflow_dispatch:
 
 permissions:

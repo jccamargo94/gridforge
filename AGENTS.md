@@ -13,7 +13,7 @@ archivo.
 | Mantenimiento de documentación y GitHub Pages | [`.agents/rules/documentation.mdc`](.agents/rules/documentation.mdc) y [`.agents/rules/github-pages.mdc`](.agents/rules/github-pages.mdc) |
 | Vision, mapa del repo, instalacion, datos requeridos, brechas conocidas | [`README.md`](README.md) (secciones 1-14) |
 | Hacia donde va el proyecto, fases | [`docs/roadmap-aplicacion-despacho.md`](docs/roadmap-aplicacion-despacho.md) |
-| Documentación pública para GitHub Pages | [docs/index.html](docs/index.html) y [docs/formulacion-matematica.html](docs/formulacion-matematica.html) |
+| Documentación pública para GitHub Pages | [`docs/index.md`](docs/index.md) y [`docs/formulacion-matematica.md`](docs/formulacion-matematica.md) (site Jekyll, ver `.agents/rules/github-pages.mdc`) |
 | Diseno + plan de una fase/feature especifica ya implementada | `docs/superpowers/specs/` + `docs/superpowers/plans/` (un par por fase) |
 
 ## Reglas basicas (siempre aplican)

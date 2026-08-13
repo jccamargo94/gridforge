@@ -52,8 +52,8 @@ describe("RunComparisonTable", () => {
       }),
     ];
     renderTable(runs);
-    expect(screen.getByText("1.5")).toBeInTheDocument();
-    expect(screen.getByText("1000")).toBeInTheDocument();
+    expect(screen.getByText("1.50")).toBeInTheDocument();
+    expect(screen.getByText("1,000.00")).toBeInTheDocument();
   });
 
   it("shows a no-metrics marker and dashes for a run with null metrics", () => {
@@ -84,8 +84,8 @@ describe("RunComparisonTable", () => {
       }),
     ];
     renderTable(runs);
-    expect(screen.getByText("1.5")).toBeInTheDocument();
-    expect(screen.getByText("1000")).toBeInTheDocument();
+    expect(screen.getByText("1.50")).toBeInTheDocument();
+    expect(screen.getByText("1,000.00")).toBeInTheDocument();
     expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });
 
@@ -114,8 +114,8 @@ describe("RunComparisonTable", () => {
       }),
     ];
     renderTable(runs);
-    expect(screen.getByText("1.5")).toBeInTheDocument();
-    expect(screen.getByText("1000")).toBeInTheDocument();
+    expect(screen.getByText("1.50")).toBeInTheDocument();
+    expect(screen.getByText("1,000.00")).toBeInTheDocument();
     expect(screen.getByText(/sin metricas/i)).toBeInTheDocument();
     expect(screen.getAllByText("\u2014").length).toBeGreaterThan(0);
   });

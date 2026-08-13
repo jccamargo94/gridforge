@@ -141,8 +141,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "chart.noData": "No hay datos de despacho todavia.",
     "chart.pricesNoData": "No hay datos de precios todavia.",
     "chart.hour": "Hora del dia",
+    "chart.hourLabel": "Hora",
     "chart.mw": "MW",
     "chart.others": "Otros",
+    "chart.resetZoom": "Restablecer zoom",
+    "chart.zoomHint": "Rueda: zoom · Arrastrar: desplazar · Doble clic: restablecer",
 
     "artifacts.noData": "No hay artefactos disponibles todavia.",
     "artifacts.downloadError": "No se pudo descargar el artefacto.",
@@ -305,8 +308,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "chart.noData": "No dispatch data yet.",
     "chart.pricesNoData": "No price data yet.",
     "chart.hour": "Hour of day",
+    "chart.hourLabel": "Hour",
     "chart.mw": "MW",
     "chart.others": "Others",
+    "chart.resetZoom": "Reset zoom",
+    "chart.zoomHint": "Scroll: zoom · Drag: pan · Double-click: reset",
 
     "artifacts.noData": "No artifacts available yet.",
     "artifacts.downloadError": "Could not download artifact.",

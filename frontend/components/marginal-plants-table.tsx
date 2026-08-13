@@ -2,6 +2,7 @@
 
 import type { MarginalPlant } from "@/lib/types";
 import { useT } from "@/lib/i18n-context";
+import { formatNumber } from "@/lib/chart-format";
 
 function hourKey(datetime: string): string {
   const timePart = datetime.includes("T")
@@ -54,9 +55,9 @@ export function MarginalPlantsTable({ rows }: { rows: MarginalPlant[] }) {
                 <tr key={`${row.generador}-${row.datetime}`} className="border-b border-border/50">
                   <td className="py-1.5 pr-3">{row.generador}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums">
-                    {row.dispatch.toFixed(2)}
+                    {formatNumber(row.dispatch, 2)}
                   </td>
-                  <td className="py-1.5 text-right tabular-nums">{row.pmax.toFixed(2)}</td>
+                  <td className="py-1.5 text-right tabular-nums">{formatNumber(row.pmax, 2)}</td>
                 </tr>
               ))}
             </tbody>

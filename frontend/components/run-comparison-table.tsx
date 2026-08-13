@@ -2,6 +2,7 @@ import type { RunDetail, RunMetrics } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n-context";
+import { formatNumber } from "@/lib/chart-format";
 
 const METRIC_ROWS: { key: keyof RunMetrics; label: string }[] = [
   { key: "rmse", label: "RMSE" },
@@ -41,15 +42,15 @@ function formatValue(key: keyof RunMetrics, val: number | null): string {
     case "bias":
     case "wape":
     case "smape":
-      return Number(val.toFixed(2)).toString();
+      return formatNumber(val, 2);
     case "r2":
-      return Number(val.toFixed(3)).toString();
+      return formatNumber(val, 3);
     case "bess_charge_mwh":
     case "bess_discharge_mwh":
     case "bess_avg_soc_mwh":
-      return Number(val.toFixed(2)).toString();
+      return formatNumber(val, 2);
     case "bess_net_revenue":
-      return Number(val.toFixed(2)).toString();
+      return formatNumber(val, 2);
     default:
       return String(val);
   }

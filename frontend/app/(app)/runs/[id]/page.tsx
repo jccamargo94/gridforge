@@ -6,6 +6,7 @@ import { LogViewer } from "@/components/log-viewer";
 import { MarginalPlantsTable } from "@/components/marginal-plants-table";
 import { PriceSeriesChart } from "@/components/price-series-chart";
 import { formatBogotaTime } from "@/lib/format-date";
+import { formatNumber } from "@/lib/chart-format";
 import { useRunDetail } from "@/hooks/use-run-detail";
 import { getRunDispatch, getRunMarginalPlants } from "@/lib/api-client";
 import { statusLabel } from "@/lib/run-status";
@@ -40,12 +41,12 @@ const STATUS_CLASSES: Record<RunStatus, string> = {
 
 function formatMetric(value: number | null, decimals = 2): string {
   if (value === null) return "\u2014";
-  return value.toFixed(decimals);
+  return formatNumber(value, decimals);
 }
 
 function formatPercent(value: number | null, decimals = 2): string {
   if (value === null) return "\u2014";
-  return (value * 100).toFixed(decimals);
+  return formatNumber(value * 100, decimals);
 }
 
 export default function RunDetailPage() {

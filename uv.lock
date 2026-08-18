@@ -583,6 +583,21 @@ wheels = [
 ]
 
 [[package]]
+name = "coramin"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "networkx" },
+    { name = "numpy" },
+    { name = "pyomo" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/29/4f/f30756e473e5970e5e9642d4a7a09b2d1082aa13be6b10cd000318837f6b/coramin-0.1.1.tar.gz", hash = "sha256:7bcb5975bcfa45b870c9e3ee51590327bc6eff075ff11dbae4029122ecc5e86c", size = 50169, upload-time = "2022-01-05T16:30:17.364Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/f8/cdd27b62e6267ee67e2a3449312abf06097dc45c14cbbe84fc71eb1b1861/coramin-0.1.1-py3-none-any.whl", hash = "sha256:1cc0e5ac36e82bc94211bdac11da75ced32fc1ded6e5e122262416525db3f49b", size = 58229, upload-time = "2022-01-05T16:30:16.39Z" },
+]
+
+[[package]]
 name = "cryptography"
 version = "50.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -933,6 +948,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "gridx-egret" },
     { name = "highspy" },
     { name = "numpy" },
     { name = "openpyxl" },
@@ -976,6 +992,7 @@ requires-dist = [
     { name = "alembic", specifier = "==1.19.0" },
     { name = "cloudpickle", marker = "extra == 'notebooks'" },
     { name = "fastapi", specifier = "==0.141.1" },
+    { name = "gridx-egret", specifier = "==0.6.2" },
     { name = "highspy", specifier = "==1.7.2" },
     { name = "holidays", marker = "extra == 'notebooks'" },
     { name = "jupyterlab", marker = "extra == 'notebooks'", specifier = "==4.2.4" },
@@ -1008,6 +1025,26 @@ dev = [
     { name = "pytest" },
     { name = "ruff", specifier = "==0.11.13" },
     { name = "ty", specifier = "==0.0.66" },
+]
+
+[[package]]
+name = "gridx-egret"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "coramin" },
+    { name = "matplotlib" },
+    { name = "networkx" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pyomo" },
+    { name = "pytest" },
+    { name = "scipy" },
+    { name = "seaborn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f0/18/91acff1a12f5ceb684e42692909a87afe79f45794f50b2c6be296b958609/gridx_egret-0.6.2.tar.gz", hash = "sha256:9c439a6b0b5312a6854955a6c2d128c2bde168fc65e3241fb291f3aefa925e53", size = 218151, upload-time = "2026-05-29T22:09:00.735Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/98/0fde099b67dbb403f5e22c4a69720bd1309d86e07f0795bf5caee913778c/gridx_egret-0.6.2-py3-none-any.whl", hash = "sha256:f50a9a821dcee0208b484f2ba575b65334eca202be9c8bc756c78085cd6537c0", size = 276350, upload-time = "2026-05-29T22:08:59.596Z" },
 ]
 
 [[package]]
@@ -1863,6 +1900,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b4/73/731debf26e27e0a0323d7bda270dc2f634b398e38f040a09da1f4351d0aa/nest_asyncio2-1.7.2.tar.gz", hash = "sha256:1921d70b92cc4612c374928d081552efb59b83d91b2b789d935c665fa01729a8", size = 14743, upload-time = "2026-02-13T00:34:04.386Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c5/3c/3179b85b0e1c3659f0369940200cd6d0fa900e6cefcc7ea0bc6dd0e29ffb/nest_asyncio2-1.7.2-py3-none-any.whl", hash = "sha256:f5dfa702f3f81f6a03857e9a19e2ba578c0946a4ad417b4c50a24d7ba641fe01", size = 7843, upload-time = "2026-02-13T00:34:02.691Z" },
+]
+
+[[package]]
+name = "networkx"
+version = "3.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl", hash = "sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762", size = 2068504, upload-time = "2025-12-08T17:02:38.159Z" },
 ]
 
 [[package]]
@@ -2919,6 +2965,20 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/52/52/e57eceff0e342a1f50e274264ed47497b59e6a4e3118808ee58ddda7b74a/scipy-1.17.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:a77cbd07b940d326d39a1d1b37817e2ee4d79cb30e7338f3d0cddffae70fcaa2", size = 37682317, upload-time = "2026-02-23T00:22:18.513Z" },
     { url = "https://files.pythonhosted.org/packages/11/2f/b29eafe4a3fbc3d6de9662b36e028d5f039e72d345e05c250e121a230dd4/scipy-1.17.1-cp314-cp314t-win_amd64.whl", hash = "sha256:eb092099205ef62cd1782b006658db09e2fed75bffcae7cc0d44052d8aa0f484", size = 37345327, upload-time = "2026-02-23T00:22:24.442Z" },
     { url = "https://files.pythonhosted.org/packages/07/39/338d9219c4e87f3e708f18857ecd24d22a0c3094752393319553096b98af/scipy-1.17.1-cp314-cp314t-win_arm64.whl", hash = "sha256:200e1050faffacc162be6a486a984a0497866ec54149a01270adc8a59b7c7d21", size = 25489165, upload-time = "2026-02-23T00:22:29.563Z" },
+]
+
+[[package]]
+name = "seaborn"
+version = "0.13.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/86/59/a451d7420a77ab0b98f7affa3a1d78a313d2f7281a57afb1a34bae8ab412/seaborn-0.13.2.tar.gz", hash = "sha256:93e60a40988f4d65e9f4885df477e2fdaff6b73a9ded434c1ab356dd57eefff7", size = 1457696, upload-time = "2024-01-25T13:21:52.551Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/83/11/00d3c3dfc25ad54e731d91449895a79e4bf2384dc3ac01809010ba88f6d5/seaborn-0.13.2-py3-none-any.whl", hash = "sha256:636f8336facf092165e27924f223d3c62ca560b1f2bb5dff7ab7fad265361987", size = 294914, upload-time = "2024-01-25T13:21:49.598Z" },
 ]
 
 [[package]]

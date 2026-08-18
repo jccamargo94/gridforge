@@ -9,6 +9,7 @@ from app.schemas.bess import BessScenario
 class DispatchLevel(str, Enum):
     preideal = "preideal"
     ideal = "ideal"
+    lmp = "lmp"
 
 
 class DispatchCase(BaseModel):
@@ -17,3 +18,4 @@ class DispatchCase(BaseModel):
     bess_scenario: BessScenario | None = None
     solver: str = "cbc"
     compute_prices: bool = True
+    nodal_network: str | None = None

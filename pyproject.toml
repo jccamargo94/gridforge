@@ -23,6 +23,7 @@ dependencies = [
     "psycopg[binary]==3.3.4",
     "alembic==1.19.0",
     "pyjwt[crypto]==2.13.0",
+    "gridx-egret==0.6.2",
 ]
 
 [project.optional-dependencies]

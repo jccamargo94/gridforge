@@ -62,7 +62,7 @@ def test_hour_clone_collapses_time_series():
 def test_enforce_commitment_zeroes_offline_gens():
     md = nodal_to_model_data(_net(), TIME_KEYS)
     hour = model_data_for_hour(md, "H00")
-    enforce_commitment(_net(), hour, {"G1": 1.0, "G2": 0.0}, 0)
+    enforce_commitment(_net(), hour, {"G1": [1.0], "G2": [0.0]}, 0)
     gens = dict(hour.elements("generator"))
     assert gens["G1"]["p_min"] == 10.0 and gens["G1"]["p_max"] == 100.0
     assert gens["G2"]["p_min"] == 0.0 and gens["G2"]["p_max"] == 0.0

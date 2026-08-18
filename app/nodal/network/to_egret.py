@@ -83,7 +83,7 @@ def enforce_commitment(
 ) -> ModelData:
     bounds = {g.name: (g.p_min, g.p_max) for g in net.generators}
     for name, gen in dict(hour_md.elements("generator")).items():
-        if commitment[name] == 0:
+        if commitment[name][t] == 0:
             gen["p_min"] = 0.0
             gen["p_max"] = 0.0
         else:

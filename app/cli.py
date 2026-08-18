@@ -56,7 +56,10 @@ def run(
         None, help="YYYY-MM-DD | range a:b | YYYY-MM | omit = all available"
     ),
     type: list[str] = typer.Option(
-        ["preideal"], "--type", "-t", help="dispatch level (preideal/ideal), repeatable, or 'all'"
+        ["preideal"],
+        "--type",
+        "-t",
+        help="dispatch level (preideal/ideal/lmp), repeatable, or 'all'",
     ),
     solver: str = typer.Option("cbc", help="pyomo solver name"),
     eval: bool = typer.Option(True, "--eval/--no-eval", help="evaluate vs XM actuals"),
@@ -71,6 +74,9 @@ def run(
     skip_dates: str = typer.Option("", help="comma-separated YYYY-MM-DD to skip"),
     out: str = typer.Option("data/results", help="results directory"),
     data_dir: str = typer.Option("data", help="input data directory"),
+    nodal_network: str = typer.Option(
+        None, "--nodal-network", help="path to a NodalNetwork JSON for -t lmp runs"
+    ),
 ):
     avail = _available_dates(data_dir)
     selected = parse_dates_arg(dates, avail)
@@ -87,6 +93,7 @@ def run(
             solver=solver,
             compute_prices=prices,
             bess_scenario=scenario,
+            nodal_network=nodal_network,
         )
         for d in selected
         for lvl in levels

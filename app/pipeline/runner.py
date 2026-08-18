@@ -13,7 +13,7 @@ from app.data.heuristic.biddings import _match_resource_name
 from app.model.model import UnitCommitmentModel
 from app.pipeline.case_builder import build_case
 from app.pipeline.results import extract_dispatch, extract_mpo, save_results
-from app.schemas import DispatchCase, InputPack, InputSource, RunResult
+from app.schemas import DispatchCase, DispatchLevel, InputPack, InputSource, RunResult
 from app.storage import get_storage
 from app.utils.metrics import mae, price_metrics, rmse
 
@@ -29,6 +29,10 @@ def run_case(
     session: Session | None = None,
 ) -> RunResult:
     t = case.level.value
+    if case.level == DispatchLevel.lmp:
+        from app.nodal.runner import run_nodal
+
+        return run_nodal(case, out=out, data_dir=data_dir)
     try:
         inputs = InputPack(dispatch_date=case.dispatch_date, source=input_source, data_dir=data_dir)
         set_data, param_data, _meta = build_case(case, inputs, ders=ders, session=session)

@@ -78,6 +78,7 @@ class EgretNodalEngine:
             commitment={g.name: list(commitment[g.name]) for g in net.generators},
             gen_cost=gen_cost,
             gen_zone={g.name: g.zone for g in net.generators},
+            gen_fuel={g.name: g.fuel for g in net.generators},
             total_cost=total_cost,
             uc_total_cost=uc_total_cost,
         )

@@ -18,6 +18,7 @@ class NodalSolution:
     commitment: dict[str, list[float]]
     gen_cost: dict[str, list[float]]
     gen_zone: dict[str, str]
+    gen_fuel: dict[str, str]
     total_cost: float
     uc_total_cost: float | None = None
 

@@ -71,3 +71,8 @@ select = ["E", "F", "I"]
 # this one never got an `__all__`. Adding one is a package-API decision, not a
 # tooling change, so it's left as a suppressed finding rather than guessed at.
 "app/model/constraints/bess/__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+markers = [
+    "live: test que llama a servicios externos (API PARATEC / XM); excluido del default",
+]

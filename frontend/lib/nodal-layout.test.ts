@@ -54,6 +54,6 @@ describe("lmpColor", () => {
     expect(lmpColor(500, 0, 100)).toBe("rgb(245, 158, 11)");
   });
   it("interpolates midpoints", () => {
-    expect(lmpColor(50, 0, 100)).toMatch(/^rgb\(/);
+    expect(lmpColor(50, 0, 100)).toBe("rgb(141, 129, 123)");
   });
 });

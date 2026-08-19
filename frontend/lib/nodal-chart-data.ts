@@ -4,6 +4,8 @@ import { t, type Lang } from "./i18n";
 export interface HourlyPoint { hour: number; [key: string]: number; }
 
 export function hourFromTimestamp(timestamp: string): number {
+  const h = timestamp.match(/^H(\d{2})$/);
+  if (h) return Number(h[1]);
   const iso = timestamp.match(/T(\d{2})/);
   if (iso) return Number(iso[1]);
   const space = timestamp.split(" ");

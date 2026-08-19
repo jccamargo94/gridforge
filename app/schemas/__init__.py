@@ -1,6 +1,7 @@
 from app.schemas.bess import BessMode, BessScenario, BessUnit
 from app.schemas.case import DispatchCase, DispatchLevel
 from app.schemas.input_pack import InputPack, InputSource
+from app.schemas.nodal_run_result import NodalRunResult
 from app.schemas.run_result import RunResult
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "DispatchCase",
     "InputSource",
     "InputPack",
+    "NodalRunResult",
     "RunResult",
 ]

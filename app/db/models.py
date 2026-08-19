@@ -48,6 +48,7 @@ class Case(Base):
     scenario_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("scenarios.id"), nullable=True
     )
+    nodal_network: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class Run(Base):
@@ -88,6 +89,24 @@ class MetricSet(Base):
     bess_net_revenue: Mapped[float | None] = mapped_column(Float, nullable=True)
     dispatch_mae_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
     dispatch_rmse_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class NodalResult(Base):
+    __tablename__ = "nodal_results"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
+    run_id: Mapped[str] = mapped_column(String, ForeignKey("runs.id"), unique=True, nullable=False)
+    metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    redistribution: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    gen_revenue_by_zone: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    network: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    lmp_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    dispatch_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    branch_flows_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    settlement_status_quo_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    settlement_lmp_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    comparison_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    summary_path: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class InputDataset(Base):

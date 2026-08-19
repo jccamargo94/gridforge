@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.db import queries
 from app.db.models import Base, Case, InputDataset, MetricSet, Run, Scenario
 
 
@@ -12,6 +13,11 @@ def _memory_engine():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     return engine
+
+
+def _session():
+    engine = _memory_engine()
+    return Session(engine)
 
 
 def test_scenario_round_trip():
@@ -126,3 +132,39 @@ def test_input_dataset_unique_dataset_partition_key():
         )
         with pytest.raises(IntegrityError):
             session.commit()
+
+
+def test_nodal_result_round_trip():
+    from app.db.models import NodalResult
+
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    row = NodalResult(
+        run_id=run.id,
+        metrics={"total_cost": 100.0},
+        redistribution=[{"zone": "norte", "delta": 5.0}],
+        gen_revenue_by_zone=[{"zone": "norte", "fuel": "hydro", "delta": 2.0}],
+        network={"name": "three_zone"},
+        lmp_path="data/results/x/lmp.csv",
+        dispatch_path="data/results/x/dispatch.csv",
+        branch_flows_path="data/results/x/branch_flows.csv",
+        settlement_status_quo_path="data/results/x/settlement_status_quo.csv",
+        settlement_lmp_path="data/results/x/settlement_lmp.csv",
+        comparison_path="data/results/x/comparison.csv",
+        summary_path="data/results/x/summary.json",
+    )
+    session.add(row)
+    session.commit()
+    fetched = session.get(NodalResult, row.id)
+    assert fetched.run_id == run.id
+    assert fetched.metrics["total_cost"] == 100.0
+    assert fetched.network["name"] == "three_zone"
+    assert fetched.summary_path == "data/results/x/summary.json"

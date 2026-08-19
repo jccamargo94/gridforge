@@ -276,3 +276,86 @@ def test_run_result_carries_nodal():
     assert result.nodal is not None
     assert result.nodal.lmp_path == "data/results/x/lmp.csv"
     assert result.nodal.metrics["total_cost"] == 100.0
+
+
+def test_create_case_and_run_stores_nodal_network():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+        nodal_network={"name": "three_zone"},
+    )
+    case = queries.get_case(session, run.case_id)
+    assert case.nodal_network == {"name": "three_zone"}
+
+
+def test_finish_nodal_run_ok_writes_nodal_result_without_metric_set():
+    from app.schemas import NodalRunResult
+
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    case = queries.get_case(session, run.case_id)
+    dispatch_case = DispatchCase(
+        dispatch_date=case.dispatch_date, level=DispatchLevel.lmp, nodal_network=None
+    )
+    result = RunResult(
+        case=dispatch_case,
+        ok=True,
+        nodal=NodalRunResult(
+            lmp_path="data/results/x/lmp.csv",
+            dispatch_path="data/results/x/dispatch.csv",
+            branch_flows_path="data/results/x/branch_flows.csv",
+            settlement_status_quo_path="data/results/x/settlement_status_quo.csv",
+            settlement_lmp_path="data/results/x/settlement_lmp.csv",
+            comparison_path="data/results/x/comparison.csv",
+            summary_path="data/results/x/summary.json",
+            metrics={"total_cost": 100.0, "congestion_rent_total": 7200.0},
+            redistribution=[{"zone": "norte", "delta": 1.0}],
+            gen_revenue_by_zone=[{"zone": "norte", "fuel": "hydro", "delta": 2.0}],
+            network={"name": "three_zone"},
+        ),
+    )
+    # el log_path seteado en memoria por el worker debe sobrevivir (sin rollback)
+    run.log_path = "data/results/x/run.log"
+    queries.finish_nodal_run_ok(session, run, result, out_dir="data/results/x")
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "done"
+    assert updated.log_path == "data/results/x/run.log"
+    # clásicas quedan en None (el set nodal es el autoritativo)
+    assert updated.dispatch_path is None
+    assert updated.price_path is None
+    assert queries.get_metric_set(session, run.id) is None
+
+    nodal = queries.get_nodal_result(session, run.id)
+    assert nodal is not None
+    assert nodal.metrics["congestion_rent_total"] == 7200.0
+    assert nodal.network["name"] == "three_zone"
+    assert nodal.summary_path == "data/results/x/summary.json"
+
+
+def test_get_nodal_result_returns_none_when_missing():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    assert queries.get_nodal_result(session, run.id) is None

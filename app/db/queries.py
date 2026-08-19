@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Case, InputDataset, MetricSet, Run, Scenario
-from app.schemas import BessScenario, RunResult
+from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, Scenario
+from app.schemas import BessScenario, NodalRunResult, RunResult
 
 
 def create_scenario(session: Session, scenario: BessScenario, created_by: str) -> Scenario:
@@ -39,6 +39,7 @@ def create_case_and_run(
     compute_prices: bool,
     scenario_id: str | None,
     user_id: str,
+    nodal_network: dict | None = None,
 ) -> Run:
     case = Case(
         dispatch_date=dispatch_date,
@@ -46,6 +47,7 @@ def create_case_and_run(
         solver=solver,
         compute_prices=compute_prices,
         scenario_id=scenario_id,
+        nodal_network=nodal_network,
     )
     session.add(case)
     session.flush()  # populate case.id before Run references it
@@ -105,6 +107,37 @@ def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -
                 dispatch_rmse_mw=metrics.get("dispatch_rmse_mw"),
             )
         )
+    session.commit()
+
+
+def get_nodal_result(session: Session, run_id: str) -> NodalResult | None:
+    stmt = select(NodalResult).where(NodalResult.run_id == run_id)
+    return session.scalars(stmt).first()
+
+
+def finish_nodal_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -> None:
+    run.status = "done"
+    run.finished_at = datetime.now(timezone.utc)
+    run.out_dir = out_dir
+    session.add(run)
+
+    nodal: NodalRunResult | None = result.nodal
+    session.add(
+        NodalResult(
+            run_id=run.id,
+            metrics=nodal.metrics if nodal else None,
+            redistribution=nodal.redistribution if nodal else None,
+            gen_revenue_by_zone=nodal.gen_revenue_by_zone if nodal else None,
+            network=nodal.network if nodal else None,
+            lmp_path=nodal.lmp_path if nodal else None,
+            dispatch_path=nodal.dispatch_path if nodal else None,
+            branch_flows_path=nodal.branch_flows_path if nodal else None,
+            settlement_status_quo_path=nodal.settlement_status_quo_path if nodal else None,
+            settlement_lmp_path=nodal.settlement_lmp_path if nodal else None,
+            comparison_path=nodal.comparison_path if nodal else None,
+            summary_path=nodal.summary_path if nodal else None,
+        )
+    )
     session.commit()
 
 

@@ -12,6 +12,7 @@ import pandas as pd
 import typer
 
 from app.data.download import ensure_data_for_date
+from app.data.topology.cli import scrape_topology_cmd
 from app.dates import parse_dates_arg
 from app.pipeline.evaluate import evaluate_saved_run
 from app.pipeline.runner import run_many
@@ -20,6 +21,8 @@ from app.schemas import DispatchCase, DispatchLevel
 from app.storage import get_storage
 
 app = typer.Typer(add_completion=False, help="Colombian dispatch model runner.")
+
+app.command(name="scrape-topology")(scrape_topology_cmd)
 
 
 @app.callback()

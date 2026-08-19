@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, RunDetail, RunSummary, Scenario } from "./types";
+import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -74,4 +74,21 @@ export async function getRunLog(id: string): Promise<string | null> {
     throw new Error(`${resp.status} ${resp.statusText}`);
   }
   return resp.text();
+}
+
+export async function getRunNodalArtifact<T>(
+  id: string,
+  artifact: NodalArtifactName,
+): Promise<T> {
+  return request<T>(`/runs/${id}/nodal/${artifact}`);
+}
+
+export async function downloadNodalArtifact(
+  id: string,
+  artifact: NodalArtifactName,
+): Promise<Blob> {
+  const headers = await authHeader();
+  const resp = await fetch(`${API_BASE_URL}/runs/${id}/download/nodal/${artifact}`, { headers });
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+  return resp.blob();
 }

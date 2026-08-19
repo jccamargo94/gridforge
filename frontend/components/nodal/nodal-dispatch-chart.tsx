@@ -6,7 +6,7 @@ import { ChartLegend, type ChartLegendItem } from "@/components/chart-legend";
 import { ChartTooltip } from "@/components/chart-tooltip";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
 import { formatNumber } from "@/lib/chart-format";
-import { useT } from "@/lib/i18n-context";
+import { useLang, useT } from "@/lib/i18n-context";
 import { toNodalDispatchSeries } from "@/lib/nodal-chart-data";
 import type { NodalDispatchRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,8 @@ interface NodalDispatchChartProps { rows: NodalDispatchRow[]; }
 
 export function NodalDispatchChart({ rows }: NodalDispatchChartProps) {
   const t = useT();
-  const { data, seriesKeys } = useMemo(() => toNodalDispatchSeries(rows), [rows]);
+  const { lang } = useLang();
+  const { data, seriesKeys } = useMemo(() => toNodalDispatchSeries(rows, lang), [rows, lang]);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const { wrapperRef, visibleData, isZoomed, reset, getWrapperProps } = useChartZoom(data);
 

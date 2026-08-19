@@ -13,7 +13,7 @@ def scrape_topology_cmd(
     d: str = typer.Option(..., "--date", help="Case date (YYYY-MM-DD)."),
     demand_source: str = typer.Option("ddem", "--demand-source"),
     demand_split: str = typer.Option("capacity", "--demand-split"),
-    out: str = typer.Option("data/topology/network.json", "--out"),
+    out: str = typer.Option("topology/network.json", "--out"),
     refresh: bool = typer.Option(False, "--refresh"),
     data_dir: str = typer.Option("data", "--data-dir"),
 ) -> None:

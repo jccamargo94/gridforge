@@ -225,3 +225,45 @@ Antes de implementar frontend/backend, conviene cerrar la interfaz de dominio:
 
 Cuando estas cuatro interfaces sean estables, el salto a API, worker y frontend
 sera mucho menos riesgoso.
+
+## Ideas de portafolio (backlog priorizado)
+
+Backlog paralelo a las fases numeradas, salido de una sesion de brainstorming
+(2026-08-14) enfocada en que features conviene agregar para demostrar
+habilidades de programacion, OR, mercado electrico colombiano y desarrollo
+agentic/RAG. No son fases secuenciales del producto — son items independientes,
+priorizados por (ejes de portafolio cubiertos) x (demostrable sin datos
+privados) / (costo de build).
+
+Contexto que valida las prioridades: el pricing run ya hace fix-and-resolve
+correcto (fijar binarios MILP, resolver LP, leer dual de `power_balance` en
+`app/model/model.py:324-345`) — el precio marginal es defendible, no hackeado.
+Eso hace que un agente que explique corridas contra esa base sea el item de
+mayor señal, y no una feature que primero tenga que arreglar el pricing.
+
+| # | Item | Ejes | Effort | Issue |
+| --- | --- | --- | --- | --- |
+| 1 | Agente "explica esta corrida" (tool-calling sobre artefactos) | OR, mercado, agentic, ingenieria | M (3-5d) | [#56](https://github.com/jccamargo94/gridforge/issues/56) |
+| 2 | Copiloto RAG sobre documentacion propia del proyecto | RAG, ingenieria | S (1-2d) | [#57](https://github.com/jccamargo94/gridforge/issues/57) |
+| 3 | Harness de benchmark de formulaciones (rampas/min-up-down) | OR | M (3-4d) | [#58](https://github.com/jccamargo94/gridforge/issues/58) |
+| 4 | BESS: formalizar modo "generador" | mercado, OR | L (5-8d) | [#59](https://github.com/jccamargo94/gridforge/issues/59) |
+| 5 | Casos de estudio con fechas reales en GitHub Pages | mercado, storytelling | S (1-2d) | [#60](https://github.com/jccamargo94/gridforge/issues/60) |
+| 6 | Pagina "como se construyo esto" (SDD real + skills) | agentic dev | XS (0.5-1d) | [#61](https://github.com/jccamargo94/gridforge/issues/61) |
+
+Item 1 es el flagship: es el unico que cubre los cuatro ejes a la vez y sus
+respuestas son verificables contra la solucion LP, no solo plausibles. Item 2
+es el unico que demuestra RAG especificamente (retrieval sobre corpus no
+estructurado) — item 1 es tool-calling sobre datos estructurados, tecnica
+distinta a proposito para mostrar ambas. Items 5 y 6 son los de menor costo:
+5 resuelve que `data/` este git-ignored (un reviewer sin datos XM reales nunca
+ve el modelo contra precio de bolsa real), 6 hace visible el desarrollo
+agentic que ya existe en `.superpowers/sdd/` y `.agents/skills/` pero que hoy
+nadie fuera del repo puede ver.
+
+Descartado explicitamente: RAG regulatorio (resoluciones CREG, acuerdos CNO).
+El corpus publico no esta verificado como fetchable de forma confiable y el
+riesgo de alucinar citas legales es alto — el copiloto de item 2 cubre el eje
+RAG sin ese riesgo, acotado a documentacion propia del repo.
+
+Detalle completo de cada item (plan de implementacion, riesgos, prerequisitos)
+en su issue correspondiente.

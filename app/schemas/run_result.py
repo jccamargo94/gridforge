@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from app.schemas.case import DispatchCase
+from app.schemas.nodal_run_result import NodalRunResult
 
 
 class RunResult(BaseModel):
@@ -14,3 +15,4 @@ class RunResult(BaseModel):
     metrics: dict[str, float] | None = None
     marginal_plants_path: str | None = None
     error: str | None = None
+    nodal: NodalRunResult | None = None

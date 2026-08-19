@@ -6,10 +6,24 @@
 # Run from repo root:
 #   docker compose --project-directory . --env-file .env -f docker/docker-compose.dev.yaml up --build
 services:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    entrypoint: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ./alembic:/app/alembic
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     # Dockerfile.api's ENTRYPOINT already runs uvicorn; `command:` would only
     # append args after it (uvicorn invoked twice), so override the entrypoint
     # itself to add --reload.
@@ -30,6 +44,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       - DATABASE_URL=${DATABASE_URL}
     volumes:

@@ -2,6 +2,16 @@
 # --project-directory . anchors ./data, ./.env and build contexts at the repo root
 # rather than at this file's own directory (docker/).
 services:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    entrypoint: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    profiles: ["backend"]
+    restart: "no"
+
   cli:
     build:
       context: .
@@ -14,6 +24,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - SUPABASE_JWKS_URL=${SUPABASE_JWKS_URL}
@@ -28,6 +41,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       - DATABASE_URL=${DATABASE_URL}
     volumes:

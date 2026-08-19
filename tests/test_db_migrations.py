@@ -73,3 +73,39 @@ def test_alembic_upgrade_head_adds_dispatch_metric_columns(tmp_path):
 
     run_columns = {c["name"] for c in inspect(engine).get_columns("runs")}
     assert "marginal_plants_path" in run_columns
+
+
+def test_alembic_upgrade_head_adds_nodal_results_table_and_case_column(tmp_path):
+    db_path = tmp_path / "migration_smoke_nodal.db"
+    database_url = f"sqlite:///{db_path}"
+
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(database_url)
+    tables = set(inspect(engine).get_table_names())
+    assert "nodal_results" in tables
+
+    columns = {c["name"] for c in inspect(engine).get_columns("nodal_results")}
+    assert {
+        "id",
+        "run_id",
+        "metrics",
+        "redistribution",
+        "gen_revenue_by_zone",
+        "network",
+        "lmp_path",
+        "dispatch_path",
+        "branch_flows_path",
+        "settlement_status_quo_path",
+        "settlement_lmp_path",
+        "comparison_path",
+        "summary_path",
+    }.issubset(columns)
+
+    unique_constraints = inspect(engine).get_unique_constraints("nodal_results")
+    assert {c["name"] for c in unique_constraints} == {"uq_nodal_results_run_id"}
+
+    case_columns = {c["name"] for c in inspect(engine).get_columns("cases")}
+    assert "nodal_network" in case_columns

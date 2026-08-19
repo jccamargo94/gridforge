@@ -256,3 +256,23 @@ def test_get_input_dataset_returns_row_when_present():
     found = queries.get_input_dataset(session, "demaCome", "2024")
     assert found is not None
     assert found.source == "pydataxm:DemaCome"
+
+
+def test_run_result_carries_nodal():
+    from app.schemas import NodalRunResult
+
+    case = DispatchCase(dispatch_date=date(2024, 4, 18), level=DispatchLevel.lmp)
+    result = RunResult(
+        case=case,
+        ok=True,
+        nodal=NodalRunResult(
+            lmp_path="data/results/x/lmp.csv",
+            metrics={"total_cost": 100.0},
+            redistribution=[{"zone": "norte", "delta": 1.0}],
+            gen_revenue_by_zone=[{"zone": "norte", "fuel": "hydro", "delta": 2.0}],
+            network={"name": "three_zone"},
+        ),
+    )
+    assert result.nodal is not None
+    assert result.nodal.lmp_path == "data/results/x/lmp.csv"
+    assert result.nodal.metrics["total_cost"] == 100.0

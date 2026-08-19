@@ -97,6 +97,7 @@ export interface CreateRunRequest {
   solver?: string;
   compute_prices?: boolean;
   scenario_id?: string | null;
+  nodal_network?: NodalNetwork | null;
 }
 
 export interface NodalSummary {

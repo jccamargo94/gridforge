@@ -1,6 +1,7 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -117,6 +118,92 @@ def test_process_once_marks_run_failed_when_run_case_raises(tmp_path, monkeypatc
     assert updated.status == "failed"
     assert updated.error is not None
     assert "solver exploded" in updated.error
+
+
+def test_process_once_solves_nodal_run_and_persists_nodal_result(tmp_path, monkeypatch):
+    from tests.fixtures.nodal import make_three_zone_network
+
+    def _no_network(*a, **kw):
+        raise AssertionError(f"unexpected network call: {a} {kw}")
+
+    monkeypatch.setattr("app.data.download.requests.get", _no_network)
+
+    session = _session()
+    net = make_three_zone_network(congested=True)
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+        nodal_network=net.model_dump(),
+    )
+
+    results_root = str(tmp_path / "results")
+    processed = process_once(session, data_dir=DD, results_root=results_root)
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "done", updated.error
+
+    nodal = queries.get_nodal_result(session, run.id)
+    assert nodal is not None
+    assert nodal.metrics["congestion_rent_total"] > 0
+    assert nodal.network["name"] == "three_zone"
+    for attr in (
+        "lmp_path",
+        "dispatch_path",
+        "branch_flows_path",
+        "settlement_status_quo_path",
+        "settlement_lmp_path",
+        "comparison_path",
+        "summary_path",
+    ):
+        path = getattr(nodal, attr)
+        assert path and Path(path).exists()
+
+    # no se escribe MetricSet clásico para corridas nodales
+    assert queries.get_metric_set(session, run.id) is None
+    # network.json escrito en out_dir
+    network_file = Path(results_root) / run.id / "network.json"
+    assert network_file.exists()
+
+
+def test_process_once_nodal_without_network_uses_example(tmp_path, monkeypatch):
+    def _no_network(*a, **kw):
+        raise AssertionError(f"unexpected network call: {a} {kw}")
+
+    monkeypatch.setattr("app.data.download.requests.get", _no_network)
+
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+        nodal_network=None,
+    )
+
+    results_root = str(tmp_path / "results")
+    processed = process_once(session, data_dir=DD, results_root=results_root)
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    assert updated.status == "done", updated.error
+    nodal = queries.get_nodal_result(session, run.id)
+    assert nodal is not None
+    assert nodal.network["name"] == "example_zonal_network"
+    # kW->MW contract (demaCome dema is kW; case_builder applies *1e-3): the
+    # example network's demand_shares must produce scaled loads (350 MW total).
+    scaled_by_zone = {load["zone"]: load["p_load"] for load in nodal.network["loads"]}
+    assert scaled_by_zone["norte"] == pytest.approx([140.0] * 24)
+    assert scaled_by_zone["centro"] == pytest.approx([122.5] * 24)
+    assert scaled_by_zone["sur"] == pytest.approx([87.5] * 24)
 
 
 def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, monkeypatch):

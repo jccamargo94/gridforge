@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/i18n-context";
 import { cn } from "@/lib/utils";
-import { Gauge, GitCompareArrows, Layers, LogOut } from "lucide-react";
+import { Gauge, GitCompareArrows, Layers, LogOut, Network } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GridForgeLogoFull } from "@/components/gridforge-logo";
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/runs", labelKey: "sidebar.runs", icon: Gauge },
   { href: "/scenarios", labelKey: "sidebar.scenarios", icon: Layers },
   { href: "/compare", labelKey: "sidebar.compare", icon: GitCompareArrows },
+  { href: "/nodal", labelKey: "sidebar.nodal", icon: Network },
 ] as const;
 
 export function AppSidebar() {
@@ -29,7 +30,7 @@ export function AppSidebar() {
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {NAV_ITEMS.map(({ href, labelKey, icon: Icon }) => {
-          const active = pathname?.startsWith(href) ?? false;
+          const active = href === "/nodal" ? pathname?.includes("/nodal") : pathname?.startsWith(href);
           return (
             <Link
               key={href}

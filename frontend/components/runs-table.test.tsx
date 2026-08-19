@@ -15,6 +15,7 @@ const runs: RunSummary[] = [
     started_at: "2024-04-18T05:00:00Z",
     finished_at: "2024-04-18T05:04:12Z",
     error: null,
+    nodal: null,
   },
 ];
 

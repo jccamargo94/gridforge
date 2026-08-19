@@ -6,7 +6,7 @@
 
 **Architecture:** Cuatro módulos con responsabilidad única bajo `app/data/topology/`: `fetch` (descarga + caché cruda), `parse` (JSON crudo → registros intermedios), `build` (registros → `NodalNetwork` pydantic), `cli` (comando Typer). El contrato de salida es el schema `NodalNetwork` ya existente en `app/nodal/network/schemas.py`; no se toca el motor nodal.
 
-**Tech Stack:** Python 3.12, `requests` (runtime), pydantic v2, Typer, pytest, `app.storage.get_storage` para I/O.
+**Tech Stack:** Python 3.12, `httpx` (runtime), pydantic v2, Typer, pytest, `app.storage.get_storage` para I/O.
 
 **Spec:** `docs/superpowers/specs/2026-08-19-paratec-topology-scraper-design.md` — este plan argumenta desde el spec; los ejecutores leen ambos. El spec es la autoridad de las decisiones de diseño; donde este plan difiere (marcado con ⚠️), el plan gana por evidencia verificada contra el código real.
 
@@ -14,14 +14,14 @@
 
 ## Global Constraints
 
-- **HTTP client: `requests`, NO `httpx`.** ⚠️ Desviación del spec: `httpx==0.28.1` está en `[dependency-groups] dev`, no en `[project] dependencies` (runtime). Usar `httpx` rompería la imagen Docker de runtime (`uv sync --no-dev`). `requests` ya es dependencia runtime sin pin y es el patrón establecido en `app/data/download.py` y `app/data/paratec.py`. **No se agrega ni mueve ninguna dependencia.**
+- **HTTP client: `httpx`, NO `requests`.** Decisión del usuario (m0116). `httpx==0.28.1` está hoy en `[dependency-groups] dev`; para que funcione en runtime (imagen Docker con `uv sync --no-dev`) hay que **moverla de `[dependency-groups] dev` a `[project] dependencies`** — una edición de `pyproject.toml` sin cambio de versión (ya está pineada en `uv.lock`), no una dependencia nueva. Ver Step 0 del Task 1.
 - **CLI invocation: `uv run python -m app scrape-topology ...`** ⚠️ Desviación del spec: `pyproject.toml` NO tiene sección `[project.scripts]`; no existe el binario `gridforge`. El patrón del README es `python -m app <cmd>` (ver `app/__main__.py`).
 - **Headers PARATEC obligatorios** (sin ellos los endpoints 404): `accept: application/json, text/plain, */*`, `origin: https://paratec.xm.com.co`, `referer: https://paratec.xm.com.co/`, `user-agent: Mozilla/5.0 ...`. Descargas de demanda usan `origin/referer: https://www.xm.com.co/` en su lugar.
 - **Todo I/O pasa por `app.storage.get_storage`** (`exists`, `open`, `list_dir`). Nunca `open()` directo.
 - **`data/` es git-ignored**; el caché crudo vive en `data/topology/raw/`. Fixtures doradas SÍ van en `tests/fixtures/topology/` (excepción `*.csv` no aplica a `.json`).
 - **No commitear a `develop`.** Rama actual: `fase6b-topologia-paratec`.
 - **Ruff bloqueante** (select E,F,I, line-length 100) vía pre-commit; `uv run pytest -q` para tests.
-- **Unidades verificadas:** reactancia de línea viene directa del endpoint (ohmios); rating MW se calcula `thermalLimit_A × kV × √3 / 1000`; capacidad `netEffectiveCapacity` en MW; demanda en MWh/h (dDEM) o MW (PRON POT).
+- **Unidades verificadas (m0116):** reactancia de línea viene en **Ω/km** (`typeLines[].reactance`), NO ohmios totales; susceptancia en **µS/km**, resistencia en **Ω/km**, longitud total en **km**. Para el schema nodal (que espera reactancia en **por unidad, base 100 MVA**), convertir `X_pu = (reactance_Ω_km × length_km) × baseMVA / kV²`. Rating MW se calcula `thermalLimit_A × kV × √3 / 1000`; capacidad `netEffectiveCapacity` en MW; demanda en MWh/h (dDEM) o MW (PRON POT).
 - **Sin atribución de IA en commits** (sin `Co-Authored-By`, sin `🤖`).
 
 ---
@@ -36,7 +36,7 @@
 | `app/data/topology/build.py` | `build_network` — registros + demanda → `NodalNetwork`; resuelve zonas, demanda, comparte demandas, valida |
 | `app/data/topology/cli.py` | `scrape_topology_cmd` — comando Typer, orquestación, salida |
 | `app/cli.py` | Registrar `scrape-topology` en el app Typer |
-| `tests/test_topology_fetch.py` | Tests fetch (monkeypatch `requests.get`) |
+| `tests/test_topology_fetch.py` | Tests fetch (monkeypatch `httpx.get`) |
 | `tests/test_topology_parse.py` | Tests parse |
 | `tests/test_topology_build.py` | Tests build (validación de referencias) |
 | `tests/test_topology_cli.py` | Tests CLI (CliRunner) |
@@ -52,7 +52,7 @@
 - Test: `tests/test_topology_fetch.py`
 
 **Interfaces:**
-- Consumes: `app.storage.get_storage` (exists, open), `requests`.
+- Consumes: `app.storage.get_storage` (exists, open), `httpx`.
 - Produces:
   - `PARATEC_HEADERS: dict[str, str]` (constante)
   - `XM_DEMAND_HEADERS: dict[str, str]` (constante)
@@ -61,14 +61,33 @@
   - `fetch_all(storage: Storage, *, refresh: bool = False) -> dict[str, Any]`
   - `fetch_demand(storage: Storage, date: datetime.date, source: str) -> str`
 
+- [ ] **Step 0: Move `httpx` to runtime dependencies**
+
+En `pyproject.toml`: quitar `httpx==0.28.1` de `[dependency-groups] dev` y agregarla a
+`[project] dependencies`. Luego `uv lock` para regenerar el lock (sin cambio de versión).
+La dependencia ya está en `uv.lock`, así que no se descarga nada nuevo.
+
+```toml
+# pyproject.toml — [project] dependencies (agregar la línea)
+httpx==0.28.1,
+```
+
+```toml
+# pyproject.toml — [dependency-groups] dev (quitar la línea)
+# httpx==0.28.1,
+```
+
+Run: `uv lock`
+Expected: lock regenerado sin cambios de versión (`uv lock` es no-op si ya coincide).
+
 - [ ] **Step 1: Write the failing test**
 
 ```python
 # tests/test_topology_fetch.py
 from datetime import date
 
+import httpx
 import pytest
-import requests
 
 from app.data.topology import fetch
 from app.storage import LocalStorage
@@ -84,7 +103,9 @@ class _FakeResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise requests.HTTPError(f"HTTP {self.status_code}")
+            raise httpx.HTTPStatusError(
+                f"HTTP {self.status_code}", request=httpx.Request("GET", ""), response=None
+            )
 
 
 def test_fetch_json_passes_paratec_headers(monkeypatch):
@@ -92,7 +113,7 @@ def test_fetch_json_passes_paratec_headers(monkeypatch):
     def fake_get(url, **kwargs):
         calls.append((url, kwargs))
         return _FakeResponse({"ok": True})
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(httpx, "get", fake_get)
 
     result = fetch.fetch_json("https://example.com/x", headers=fetch.PARATEC_HEADERS)
     assert result == {"ok": True}
@@ -109,7 +130,7 @@ def test_fetch_all_caches_raw_json(tmp_path, monkeypatch):
         name = url.rsplit("/", 1)[-1].replace("get", "data")
         return _FakeResponse({"header": {"code": 200}, "data": [{"from": name}]})
 
-    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(httpx, "get", fake_get)
 
     first = fetch.fetch_all(storage)
     second = fetch.fetch_all(storage)  # should be cache no-op
@@ -137,7 +158,7 @@ import json
 from datetime import date
 from typing import Any
 
-import requests
+import httpx
 
 from app.storage import Storage
 
@@ -184,7 +205,7 @@ TIMEOUT = 30
 
 def fetch_json(url: str, *, headers: dict[str, str]) -> Any:
     """GET url and return parsed JSON; raises on non-2xx."""
-    resp = requests.get(url, headers=headers, timeout=TIMEOUT)
+    resp = httpx.get(url, headers=headers, timeout=TIMEOUT)
     resp.raise_for_status()
     return resp.json()
 
@@ -222,7 +243,7 @@ def fetch_demand(storage: Storage, d: date, source: str) -> str:
     if storage.exists(raw_path):
         with storage.open(raw_path, "r") as fh:
             return fh.read()
-    resp = requests.get(
+    resp = httpx.get(
         XM_DEMAND_BASE,
         params={"ruta": ruta, "nombreBlobContainer": "storageportalxm"},
         headers=XM_DEMAND_HEADERS,
@@ -243,7 +264,7 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/data/topology/__init__.py app/data/topology/fetch.py tests/test_topology_fetch.py
+git add pyproject.toml uv.lock app/data/topology/__init__.py app/data/topology/fetch.py tests/test_topology_fetch.py
 git commit -m "feat(topology): add PARATEC fetch layer with raw cache"
 ```
 
@@ -259,7 +280,7 @@ git commit -m "feat(topology): add PARATEC fetch layer with raw cache"
 - Consumes: raw payloads de Task 1 (`{header, data}` o `{data: [...]}`), texto de demanda.
 - Produces:
   - `Substation = dict` con claves `name, base_kv, subarea, latitude, longitude`
-  - `ParsedBranch = dict` con `name, from_zone, to_zone, reactance, rating`
+  - `ParsedBranch = dict` con `name, from_zone, to_zone, reactance_ohm, kv, rating`
   - `ParsedGenerator = dict` con `name, capacity, fuel, marginal_cost, subarea, latitude, longitude`
   - `parse_substations(payload: Any) -> list[dict]`
   - `parse_lines(payload: Any) -> list[dict]`
@@ -298,7 +319,7 @@ def test_parse_substations_extracts_zone_fields():
     ]
 
 
-def test_parse_lines_computes_rating_mw():
+def test_parse_lines_computes_reactance_ohm_and_rating_mw():
     payload = {
         "data": [
             {
@@ -306,7 +327,8 @@ def test_parse_lines_computes_rating_mw():
                 "subStation": "AGUABLANCA - JUANCHITO 1",
                 "ratedVoltage": "115",
                 "thermalLimit": 600,
-                "typeLines": [{"reactance": 1.23}],
+                "length": 5.63,
+                "typeLines": [{"reactance": 1.23, "length": 5.63}],
             }
         ]
     }
@@ -314,7 +336,9 @@ def test_parse_lines_computes_rating_mw():
     line = lines[0]
     assert line["from_zone"] == "AGUABLANCA"
     assert line["to_zone"] == "JUANCHITO 1"
-    assert line["reactance"] == 1.23
+    # 1.23 Ω/km × 5.63 km = 6.9249 Ω total (per-unit conversion happens in build)
+    assert abs(line["reactance_ohm"] - 6.9249) < 1e-3
+    assert line["kv"] == 115.0
     # 600 A × 115 kV × sqrt(3) / 1000 ≈ 119.5 MW
     assert abs(line["rating"] - 119.5) < 0.1
 
@@ -385,16 +409,22 @@ def parse_lines(payload: Any) -> list[dict]:
         if thermal_a is None:
             thermal_a = row.get("ratedCurrent") or 0.0
         rating = float(thermal_a) * kv * math.sqrt(3) / 1000.0
-        reactance = 0.0
+        # Reactance comes per-km (Ω/km). Total Ω = Σ (X1_i × length_i) over tramos.
+        # Fallback: use row-level length if a tramo has no length of its own.
+        row_length = float(row.get("length") or 0.0)
+        reactance_ohm = 0.0
         type_lines = row.get("typeLines") or []
-        if type_lines:
-            reactance = float(type_lines[0].get("reactance") or 0.0)
+        for tl in type_lines:
+            x_km = float(tl.get("reactance") or 0.0)
+            seg_len = float(tl.get("length") or row_length)
+            reactance_ohm += x_km * seg_len
         lines.append(
             {
                 "name": row.get("name") or sub,
                 "from_zone": from_zone,
                 "to_zone": to_zone,
-                "reactance": reactance,
+                "reactance_ohm": reactance_ohm,
+                "kv": kv,
                 "rating": rating,
             }
         )
@@ -524,7 +554,7 @@ SUBS = [
 ]
 LINES = [
     {"name": "CALI - YUMBO 1", "from_zone": "CALI", "to_zone": "YUMBO",
-     "reactance": 0.5, "rating": 120.0},
+     "reactance_ohm": 66.125, "kv": 115.0, "rating": 120.0},
 ]
 GENS = [
     {"name": "H_CALI", "capacity": 200.0, "fuel": "hydro",
@@ -551,10 +581,17 @@ def test_demand_shares_cover_all_zones_and_sum_to_one():
 def test_build_fails_on_dangling_branch_zone():
     bad_lines = [
         {"name": "CALI - GHOST", "from_zone": "CALI", "to_zone": "GHOST",
-         "reactance": 0.5, "rating": 120.0},
+         "reactance_ohm": 66.125, "kv": 115.0, "rating": 120.0},
     ]
     with pytest.raises(ValueError, match="GHOST"):
         build.build_network(SUBS, bad_lines, GENS, DEMAND)
+
+
+def test_build_converts_reactance_to_per_unit():
+    network = build.build_network(SUBS, LINES, GENS, DEMAND)
+    branch = network.branches[0]
+    # X_pu = X_ohm × baseMVA / kV² = 66.125 × 100 / 115² = 0.5
+    assert abs(branch.reactance - 0.5) < 1e-9
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -588,6 +625,13 @@ def _haversine_km(lat1, lon1, lat2, lon2) -> float:
     dl = math.radians(lon2 - lon1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
+
+
+def _reactance_pu(ohm: float, kv: float, base_mva: float = 100.0) -> float:
+    """Convert Ω (total line reactance) to per-unit on baseMVA at the line's kV."""
+    if kv <= 0:
+        return 0.0
+    return ohm * base_mva / (kv * kv)
 
 
 def _nearest_zone(lat, lon, subs, subarea=None) -> str:
@@ -662,7 +706,7 @@ def build_network(
             name=l["name"],
             from_zone=l["from_zone"],
             to_zone=l["to_zone"],
-            reactance=l["reactance"],
+            reactance=_reactance_pu(l["reactance_ohm"], l["kv"]),
             rating=l["rating"],
         )
         for l in lines
@@ -852,7 +896,9 @@ git commit -m "feat(topology): register scrape-topology CLI command"
 // tests/fixtures/topology/substations.json
 {"header": {"code": 200}, "data": [
   {"elementName": "AGUABLANCA", "subAreaName": "SubArea Valle",
-   "voltageLevel": [115, 110], "latitude": 3.45, "longitude": -76.5}
+   "voltageLevel": [115, 110], "latitude": 3.45, "longitude": -76.5},
+  {"elementName": "ALFEREZ II", "subAreaName": "SubArea Valle",
+   "voltageLevel": [115], "latitude": 3.46, "longitude": -76.51}
 ]}
 ```
 
@@ -860,7 +906,8 @@ git commit -m "feat(topology): register scrape-topology CLI command"
 // tests/fixtures/topology/lines.json
 {"data": [
   {"name": "AGUABLANCA - ALFEREZ II 115 kV", "subStation": "AGUABLANCA - ALFEREZ II",
-   "ratedVoltage": "115", "thermalLimit": 600, "typeLines": [{"reactance": 1.23}]}
+   "ratedVoltage": "115", "thermalLimit": 600, "length": 5.63,
+   "typeLines": [{"reactance": 1.23, "length": 5.63}]}
 ]}
 ```
 
@@ -1008,7 +1055,7 @@ git commit -m "docs: document scrape-topology CLI and live pytest marker"
 **Spec coverage:**
 - ✅ zonas = subestaciones (Task 2 `parse_substations` + Task 3 `build_network`)
 - ✅ generadores desde catálogo NetEffectiveCapacities + cruce con getAllFuel/hidro/solar/eólica (Task 2 `parse_generators`; el cruce fino de heat-rate por planta se deja como refinamiento documentado, con fallback tabulado)
-- ✅ ramas desde Line/getAll con rating MW calculado (Task 2 `parse_lines`)
+- ✅ ramas desde Line/getAll con rating MW calculado y reactancia Ω/km → per-unit (Task 2 `parse_lines` + Task 3 `_reactance_pu`)
 - ✅ demanda dDEM/PRON con subárea → zonas (Task 2 `parse_demand`, Task 3 `build_demand_shares`)
 - ✅ `demand_shares` cubren exactamente todas las zonas y suman 1.0 (Task 3 + validación del schema)
 - ✅ referencias colgantes fallan nombrando la zona/rama (Task 3, test `test_build_fails_on_dangling_branch_zone`)
@@ -1017,4 +1064,4 @@ git commit -m "docs: document scrape-topology CLI and live pytest marker"
 
 **Placeholder scan:** sin TBD/TODO; todos los code steps muestran contenido real. El único refinamiento deliberado (`heatRate` por planta en `marginal_cost`) usa un fallback tabulado de 80 USD/MWh documentado en el spec, no un placeholder.
 
-**Type consistency:** `parse_substations` → `list[dict]` con claves `name/base_kv/subarea/latitude/longitude`; `build_network` consume exactamente esas claves. `parse_lines` → `from_zone/to_zone/reactance/rating`; `Branch` usa los mismos nombres. `parse_generators` → `name/capacity/fuel/marginal_cost/subarea/latitude/longitude`; `assign_generators` las consume. Nombres de funciones consistentes entre Tasks 2 y 3.
+**Type consistency:** `parse_substations` → `list[dict]` con claves `name/base_kv/subarea/latitude/longitude`; `build_network` consume exactamente esas claves. `parse_lines` → `from_zone/to_zone/reactance_ohm/kv/rating`; `build_network` convierte `reactance_ohm`+`kv` a per-unit vía `_reactance_pu`. `parse_generators` → `name/capacity/fuel/marginal_cost/subarea/latitude/longitude`; `assign_generators` las consume. Nombres de funciones consistentes entre Tasks 2 y 3.

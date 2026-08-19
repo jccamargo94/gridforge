@@ -77,7 +77,7 @@ describe("Run detail page", () => {
 
   it("links to the nodal dashboard when the run has nodal data", async () => {
     render(<Page />, { wrapper });
-    const link = await screen.findByRole("link", { name: /Abrir dashboard/i });
+    const link = await screen.findByRole("link", { name: /Analisis nodal/i });
     expect(link).toHaveAttribute("href", "/runs/run-1/nodal");
   });
 
@@ -85,6 +85,6 @@ describe("Run detail page", () => {
     vi.mocked(getRun).mockResolvedValue({ ...NODAL_RUN, nodal: null });
     render(<Page />, { wrapper });
     await waitFor(() => expect(screen.getByText("run-1")).toBeInTheDocument());
-    expect(screen.queryByRole("link", { name: /Abrir dashboard/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Analisis nodal/i })).toBeNull();
   });
 });

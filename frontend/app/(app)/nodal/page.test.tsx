@@ -56,8 +56,8 @@ describe("Nodal list page", () => {
 
   it("links done nodal runs to the dashboard", async () => {
     render(<Page />, { wrapper });
-    await waitFor(() => expect(screen.getByText(/Abrir dashboard/i)).toBeInTheDocument());
-    expect(screen.getByRole("link", { name: /Abrir dashboard/i })).toHaveAttribute(
+    await waitFor(() => expect(screen.getByText(/Analisis nodal/i)).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /Analisis nodal/i })).toHaveAttribute(
       "href", "/runs/run-nodal-1/nodal",
     );
   });

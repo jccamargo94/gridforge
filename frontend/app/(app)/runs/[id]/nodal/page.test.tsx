@@ -116,4 +116,12 @@ describe("Nodal dashboard page", () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "3" } });
     expect(screen.getByRole("combobox")).toHaveValue("3");
   });
+
+  it("renders the run level as a badge", async () => {
+    render(<Page />, { wrapper });
+    await waitFor(() => expect(screen.getByText("run-1")).toBeInTheDocument());
+    const badge = screen.getByText("lmp");
+    expect(badge.className).toContain("bg-amber-500/10");
+    expect(badge.className).toContain("border");
+  });
 });

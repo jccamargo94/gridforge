@@ -120,7 +120,9 @@ export default function NodalDashboardPage() {
             <p className="truncate font-mono text-xs text-muted-foreground">{run.data.run_id}</p>
             <h1 className="font-heading text-xl font-bold">
               {run.data.dispatch_date}
-              <span className="ml-2 text-sm font-normal text-muted-foreground">{run.data.level}</span>
+              <span className="ml-2 inline-flex items-center rounded-md px-2 py-0.5 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                {run.data.level}
+              </span>
             </h1>
             <p className="text-xs text-muted-foreground">{formatBogotaTime(run.data.created_at)}</p>
           </div>

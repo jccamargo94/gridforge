@@ -1,1 +1,1 @@
-"""Scraper de topología PARATEC → NodalNetwork."""
+"""PARATEC → NodalNetwork topology scraper."""

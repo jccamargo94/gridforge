@@ -48,6 +48,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "runs.newExecutionDesc": "Configura e inicia una ejecucion de despacho para una fecha especifica.",
     "runs.executionHistory": "Historial de ejecuciones",
     "runs.loading": "Cargando ejecuciones...",
+    "runs.loadError": "No se pudieron cargar las ejecuciones.",
     "runs.empty": "Sin ejecuciones todavia.",
     "runs.emptyHint": "Crea tu primera ejecucion usando el formulario de arriba.",
 
@@ -91,6 +92,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "runsTable.created": "Creado",
     "runsTable.duration": "Duracion",
     "runsTable.view": "Ver",
+    "runsTable.runId": "ID de corrida",
     "runsTable.empty": "Sin ejecuciones todavia.",
 
     "status.pending": "Pendiente",
@@ -189,6 +191,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "nodal.fuel": "Combustible",
     "nodal.marginalCost": "Costo marginal",
     "nodal.branch": "Rama",
+    "nodal.zones": "Zonas",
+    "nodal.generators": "Generadores",
+    "nodal.branches": "Ramas",
     "nodal.fromTo": "Tramo",
     "nodal.reactance": "Reactancia",
     "nodal.rating": "Capacidad (MW)",
@@ -274,6 +279,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "runs.newExecutionDesc": "Configure and launch a dispatch model run for a specific date.",
     "runs.executionHistory": "Execution History",
     "runs.loading": "Loading executions...",
+    "runs.loadError": "Could not load executions.",
     "runs.empty": "No executions yet.",
     "runs.emptyHint": "Create your first dispatch run using the form above.",
 
@@ -317,6 +323,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "runsTable.created": "Created",
     "runsTable.duration": "Duration",
     "runsTable.view": "View",
+    "runsTable.runId": "Run ID",
     "runsTable.empty": "No executions yet.",
 
     "status.pending": "Pending",
@@ -415,6 +422,9 @@ const dict: Record<Lang, Record<string, string>> = {
     "nodal.fuel": "Fuel",
     "nodal.marginalCost": "Marginal cost",
     "nodal.branch": "Branch",
+    "nodal.zones": "Zones",
+    "nodal.generators": "Generators",
+    "nodal.branches": "Branches",
     "nodal.fromTo": "Segment",
     "nodal.reactance": "Reactance",
     "nodal.rating": "Rating (MW)",

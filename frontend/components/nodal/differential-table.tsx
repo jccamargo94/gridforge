@@ -59,8 +59,8 @@ export function DifferentialTable({ redistribution, genRevenue }: DifferentialTa
               </TableRow>
             </TableHeader>
             <TableBody>
-              {genRevenue.map((row) => (
-                <TableRow key={`${row.zone}-${row.fuel}`}>
+              {genRevenue.map((row, index) => (
+                <TableRow key={`${row.zone}-${row.fuel}-${index}`}>
                   <TableCell className="font-medium">{row.zone}</TableCell>
                   <TableCell>{row.fuel}</TableCell>
                   <TableCell className="tabular-nums">{formatNumber(row.revenue_a)}</TableCell>

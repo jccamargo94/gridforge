@@ -26,4 +26,13 @@ describe("DifferentialTable", () => {
     expect(screen.getByText("hydro")).toBeInTheDocument();
     expect(screen.getAllByText(/Ingreso generacion A/i).length).toBeGreaterThan(0);
   });
+
+  it("renders duplicate (zone, fuel) rows without a key collision", () => {
+    const duplicateGenRevenue: NodalGenRevenueRow[] = [
+      ...GEN_REVENUE,
+      { zone: "centro", fuel: "hydro", revenue_a: 60, revenue_b: 80, delta: 20 },
+    ];
+    render(<I18nProvider><DifferentialTable redistribution={REDISTRIBUTION} genRevenue={duplicateGenRevenue} /></I18nProvider>);
+    expect(screen.getAllByText("hydro")).toHaveLength(2);
+  });
 });

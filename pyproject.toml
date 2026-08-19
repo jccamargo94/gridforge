@@ -24,6 +24,7 @@ dependencies = [
     "alembic==1.19.0",
     "pyjwt[crypto]==2.13.0",
     "gridx-egret==0.6.2",
+    "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +39,6 @@ notebooks = [
 [dependency-groups]
 dev = [
     "pytest",
-    "httpx==0.28.1",
     "ruff==0.11.13",
     "pre-commit==4.6.1",
     "ty==0.0.66",

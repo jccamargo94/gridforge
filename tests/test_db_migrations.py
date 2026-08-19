@@ -109,3 +109,11 @@ def test_alembic_upgrade_head_adds_nodal_results_table_and_case_column(tmp_path)
 
     case_columns = {c["name"] for c in inspect(engine).get_columns("cases")}
     assert "nodal_network" in case_columns
+
+    command.downgrade(cfg, "0004")
+
+    tables = set(inspect(engine).get_table_names())
+    assert "nodal_results" not in tables
+
+    case_columns = {c["name"] for c in inspect(engine).get_columns("cases")}
+    assert "nodal_network" not in case_columns

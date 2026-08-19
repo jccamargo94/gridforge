@@ -333,9 +333,14 @@ def get_nodal_artifact(
     if artifact == "summary":
         with get_storage(".").open(path) as f:
             return json.load(f)
-    with get_storage(".").open(path) as f:
-        df = pd.read_csv(f)
-    return df.to_dict(orient="records")
+    try:
+        with get_storage(".").open(path) as f:
+            df = pd.read_csv(f)
+    except (pd.errors.EmptyDataError, ValueError) as exc:
+        raise HTTPException(
+            status_code=404, detail=f"artifact {artifact} is not a readable CSV"
+        ) from exc
+    return df.astype(object).where(pd.notnull(df), None).to_dict(orient="records")
 
 
 @app.get("/runs/{run_id}/download/nodal/{artifact}")

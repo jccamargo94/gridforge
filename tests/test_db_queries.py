@@ -359,3 +359,23 @@ def test_get_nodal_result_returns_none_when_missing():
         user_id="user-1",
     )
     assert queries.get_nodal_result(session, run.id) is None
+
+
+def test_finish_nodal_run_ok_requires_nodal_result():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="lmp",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    case = queries.get_case(session, run.case_id)
+    dispatch_case = DispatchCase(
+        dispatch_date=case.dispatch_date, level=DispatchLevel.lmp, nodal_network=None
+    )
+    result = RunResult(case=dispatch_case, ok=True, nodal=None)
+    with pytest.raises(AssertionError):
+        queries.finish_nodal_run_ok(session, run, result, out_dir="data/results/x")

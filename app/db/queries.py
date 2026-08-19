@@ -116,6 +116,7 @@ def get_nodal_result(session: Session, run_id: str) -> NodalResult | None:
 
 
 def finish_nodal_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -> None:
+    assert result.nodal is not None
     run.status = "done"
     run.finished_at = datetime.now(timezone.utc)
     run.out_dir = out_dir

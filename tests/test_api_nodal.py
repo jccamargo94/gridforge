@@ -161,6 +161,14 @@ def test_get_nodal_artifact_404_for_unknown_artifact(api_client, tmp_path):
     assert resp.status_code == 404
 
 
+def test_get_nodal_artifact_404_for_unparseable_csv(api_client, tmp_path):
+    run_id = _seed_done_nodal_run(api_client, tmp_path)
+    lmp_path = tmp_path / "results" / run_id / "2024-04-18-lmp" / "lmp.csv"
+    lmp_path.write_text("")
+    resp = api_client.get(f"/runs/{run_id}/nodal/lmp")
+    assert resp.status_code == 404
+
+
 def test_nodal_run_ownership_404(api_client, tmp_path):
     run_id = _seed_done_nodal_run(api_client, tmp_path)
     session = api_client.SessionLocal()

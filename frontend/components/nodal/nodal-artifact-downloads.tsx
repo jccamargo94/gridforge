@@ -35,7 +35,9 @@ export function NodalArtifactDownloads({ runId, artifacts }: NodalArtifactDownlo
       const a = document.createElement("a");
       a.href = url;
       a.download = `${name}-${runId}${ext}`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);

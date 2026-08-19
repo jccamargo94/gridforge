@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 from app.data.actuals import load_reference_price
 from app.db import queries
 from app.db.session import get_engine, get_sessionmaker
+from app.nodal.network.schemas import NodalNetwork
 from app.schemas import BessScenario, DispatchLevel
 from app.storage import get_storage
 from services.api.auth import get_current_user_id
@@ -75,6 +77,7 @@ class RunCreateRequest(BaseModel):
     solver: str = "cbc"
     compute_prices: bool = True
     scenario_id: str | None = None
+    nodal_network: NodalNetwork | None = None
 
 
 def _run_summary(run, case) -> dict:
@@ -140,6 +143,8 @@ def create_run(
 ):
     if body.scenario_id is not None and queries.get_scenario(session, body.scenario_id) is None:
         raise HTTPException(status_code=404, detail="scenario not found")
+    if body.nodal_network is not None and body.level != DispatchLevel.lmp:
+        raise HTTPException(status_code=400, detail="nodal_network is only valid for level lmp")
     run = queries.create_case_and_run(
         session,
         dispatch_date=body.dispatch_date,
@@ -148,6 +153,7 @@ def create_run(
         compute_prices=body.compute_prices,
         scenario_id=body.scenario_id,
         user_id=user_id,
+        nodal_network=body.nodal_network.model_dump() if body.nodal_network else None,
     )
     return {"run_id": run.id, "status": run.status}
 
@@ -191,6 +197,21 @@ def get_run_detail(
         "marginal_plants": run.marginal_plants_path is not None,
     }
     out["price_series"] = _price_series(run, case)
+    nodal_result = queries.get_nodal_result(session, run.id)
+    out["nodal"] = (
+        {
+            "metrics": nodal_result.metrics,
+            "redistribution": nodal_result.redistribution,
+            "gen_revenue_by_zone": nodal_result.gen_revenue_by_zone,
+            "network": nodal_result.network,
+            "artifacts": {
+                name: getattr(nodal_result, attr) is not None
+                for name, attr in _NODAL_ARTIFACT_PATHS.items()
+            },
+        }
+        if nodal_result
+        else None
+    )
     return out
 
 
@@ -212,6 +233,31 @@ _ARTIFACT_PATHS = {
     "bess": "bess_path",
     "marginal_plants": "marginal_plants_path",
 }
+
+_NODAL_ARTIFACT_PATHS = {
+    "lmp": "lmp_path",
+    "dispatch": "dispatch_path",
+    "branch_flows": "branch_flows_path",
+    "settlement_status_quo": "settlement_status_quo_path",
+    "settlement_lmp": "settlement_lmp_path",
+    "comparison": "comparison_path",
+    "summary": "summary_path",
+}
+
+
+def _get_owned_nodal_result(session, run, artifact: str):
+    nodal = queries.get_nodal_result(session, run.id)
+    if nodal is None:
+        raise HTTPException(status_code=404, detail="run has no nodal results yet")
+    attr = _NODAL_ARTIFACT_PATHS.get(artifact)
+    if attr is None:
+        raise HTTPException(status_code=404, detail="unknown artifact")
+    path = getattr(nodal, attr)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"run has no {artifact} artifact yet")
+    if not get_storage(".").exists(path):
+        raise HTTPException(status_code=404, detail="artifact file missing on disk")
+    return nodal, path
 
 
 def _artifact_path(run, artifact: str) -> str:
@@ -266,4 +312,40 @@ def download_run_artifact(
 ):
     run = _get_owned_run(session, run_id, user_id)
     path = _artifact_path(run, artifact)
+    return FileResponse(path)
+
+
+def _normalize_nodal_artifact(artifact: str) -> str:
+    if artifact.endswith(".csv") or artifact.endswith(".json"):
+        return artifact[: -len(".csv")] if artifact.endswith(".csv") else artifact[: -len(".json")]
+    return artifact
+
+
+@app.get("/runs/{run_id}/nodal/{artifact}")
+def get_nodal_artifact(
+    run_id: str,
+    artifact: str,
+    user_id: str = Depends(get_current_user_id),
+    session=Depends(get_session),
+):
+    run = _get_owned_run(session, run_id, user_id)
+    nodal, path = _get_owned_nodal_result(session, run, artifact)
+    if artifact == "summary":
+        with get_storage(".").open(path) as f:
+            return json.load(f)
+    with get_storage(".").open(path) as f:
+        df = pd.read_csv(f)
+    return df.to_dict(orient="records")
+
+
+@app.get("/runs/{run_id}/download/nodal/{artifact}")
+def download_nodal_artifact(
+    run_id: str,
+    artifact: str,
+    user_id: str = Depends(get_current_user_id),
+    session=Depends(get_session),
+):
+    run = _get_owned_run(session, run_id, user_id)
+    logical = _normalize_nodal_artifact(artifact)
+    _, path = _get_owned_nodal_result(session, run, logical)
     return FileResponse(path)

@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import time
 import traceback
 
@@ -47,6 +48,12 @@ def process_once(
         case_row = queries.get_case(session, run.case_id)
         case = _build_case(session, case_row)
 
+        if case_row.nodal_network:
+            network_path = f"{out_dir}/network.json"
+            with get_storage(".").open(network_path, "w") as f:
+                json.dump(case_row.nodal_network, f)
+            case.nodal_network = network_path
+
         # Close the read-only transaction _build_case's queries opened so the
         # session sits idle (not idle-in-transaction) for the duration of the
         # solve, instead of pinning a pooler connection with an open transaction.
@@ -62,7 +69,10 @@ def process_once(
             run.log_path = log_path
 
         if result.ok:
-            queries.finish_run_ok(session, run, result, out_dir=out_dir)
+            if result.nodal is not None:
+                queries.finish_nodal_run_ok(session, run, result, out_dir=out_dir)
+            else:
+                queries.finish_run_ok(session, run, result, out_dir=out_dir)
         else:
             queries.finish_run_failed(
                 session, run, result.error or "unknown error", log_path=log_path

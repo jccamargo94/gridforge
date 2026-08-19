@@ -36,7 +36,7 @@ def build_zonal_loads(net: NodalNetwork, dispatch_date: date, data_dir: str) -> 
     if len(hourly) < 24:
         raise ValueError(f"expected 24 hourly demand rows for {dispatch_date}, got {len(hourly)}")
     return [
-        BusLoad(zone=z, p_load=[hourly[t] * net.demand_shares[z] for t in range(24)])
+        BusLoad(zone=z, p_load=[hourly[t] * 1e-3 * net.demand_shares[z] for t in range(24)])
         for z in net.demand_shares
     ]
 

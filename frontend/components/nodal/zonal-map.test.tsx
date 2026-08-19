@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "@/lib/i18n-context";
-import type { LmpRow } from "@/lib/types";
+import type { LmpRow, NodalBusLoad } from "@/lib/types";
 import { ZonalMap } from "./zonal-map";
 
 const ZONES = [
@@ -24,12 +24,17 @@ const LMP_ROWS: LmpRow[] = [
   { timestamp: "2024-04-18 00:00", bus: "sur", lmp: 40 },
   { timestamp: "2024-04-18 01:00", bus: "norte", lmp: 21 },
 ];
+const LOADS: NodalBusLoad[] = [
+  { zone: "norte", p_load: Array.from({ length: 24 }, (_, i) => 100 + i) },
+  { zone: "centro", p_load: Array.from({ length: 24 }, (_, i) => 200 + i) },
+  { zone: "sur", p_load: Array.from({ length: 24 }, (_, i) => 300 + i) },
+];
 
 describe("ZonalMap", () => {
   it("renders one node per zone and one edge per branch", () => {
     const { container } = render(
       <I18nProvider>
-        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} hour={0} />
+        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} loads={LOADS} hour={0} />
       </I18nProvider>,
     );
     expect(container.querySelectorAll("circle")).toHaveLength(3);
@@ -39,7 +44,7 @@ describe("ZonalMap", () => {
   it("colors nodes by lmp at the selected hour", () => {
     const { container } = render(
       <I18nProvider>
-        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} hour={0} />
+        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} loads={LOADS} hour={0} />
       </I18nProvider>,
     );
     const fills = [...container.querySelectorAll("circle")].map((c) => c.getAttribute("fill"));
@@ -50,9 +55,23 @@ describe("ZonalMap", () => {
   it("includes a tooltip title per zone", () => {
     const { container } = render(
       <I18nProvider>
-        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} hour={0} />
+        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} loads={LOADS} hour={0} />
       </I18nProvider>,
     );
     expect(container.querySelector("title")?.textContent).toContain("norte");
+  });
+
+  it("shows zone load and installed capacity in the tooltip", () => {
+    const { container } = render(
+      <I18nProvider>
+        <ZonalMap zones={ZONES} branches={BRANCHES} generators={GENERATORS} lmpRows={LMP_ROWS} loads={LOADS} hour={0} />
+      </I18nProvider>,
+    );
+    const titles = [...container.querySelectorAll("title")].map((t) => t.textContent);
+    const norte = titles.find((t) => t?.includes("norte"));
+    expect(norte).toContain("Carga");
+    expect(norte).toContain("100");
+    expect(norte).toContain("Capacidad instalada");
+    expect(norte).toContain("500");
   });
 });

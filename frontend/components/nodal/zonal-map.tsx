@@ -4,17 +4,18 @@ import { useMemo } from "react";
 import { useT } from "@/lib/i18n-context";
 import { computeZoneLayout, lmpColor } from "@/lib/nodal-layout";
 import { zoneLmpAtHour } from "@/lib/nodal-chart-data";
-import type { LmpRow, NodalBranch, NodalGenerator, NodalZone } from "@/lib/types";
+import type { LmpRow, NodalBranch, NodalBusLoad, NodalGenerator, NodalZone } from "@/lib/types";
 
 interface ZonalMapProps {
   zones: NodalZone[];
   branches: NodalBranch[];
   generators: NodalGenerator[];
   lmpRows: LmpRow[];
+  loads: NodalBusLoad[];
   hour: number;
 }
 
-export function ZonalMap({ zones, branches, generators, lmpRows, hour }: ZonalMapProps) {
+export function ZonalMap({ zones, branches, generators, lmpRows, loads, hour }: ZonalMapProps) {
   const t = useT();
   const layout = useMemo(
     () => computeZoneLayout(
@@ -28,8 +29,9 @@ export function ZonalMap({ zones, branches, generators, lmpRows, hour }: ZonalMa
     .filter((value): value is number => value !== null);
   const min = zoneValues.length ? Math.min(...zoneValues) : 0;
   const max = zoneValues.length ? Math.max(...zoneValues) : 0;
-  const zoneLoad = (zone: string) =>
+  const zoneInstalledCapacity = (zone: string) =>
     generators.filter((g) => g.zone === zone).reduce((sum, g) => sum + g.p_max, 0);
+  const zoneLoad = (zone: string) => loads.find((l) => l.zone === zone)?.p_load[hour] ?? 0;
 
   return (
     <svg viewBox="0 0 600 400" className="h-auto w-full" role="img">
@@ -49,7 +51,7 @@ export function ZonalMap({ zones, branches, generators, lmpRows, hour }: ZonalMa
         const fill = lmp === null ? "#71717a" : lmpColor(lmp, min, max);
         return (
           <g key={zone.name}>
-            <title>{`${zone.name} - LMP: ${lmp ?? "-"} - ${zoneLoad(zone.name)} ${t("nodal.unitMw")}`}</title>
+            <title>{`${zone.name} - LMP: ${lmp ?? "-"} - ${t("nodal.load")}: ${zoneLoad(zone.name)} ${t("nodal.unitMw")} - ${t("nodal.installedCapacity")}: ${zoneInstalledCapacity(zone.name)} ${t("nodal.unitMw")}`}</title>
             <circle cx={point.x} cy={point.y} r={30} fill={fill} stroke="#18181b" strokeWidth={2} />
             <text x={point.x} y={point.y + 4} textAnchor="middle" fill="#fafafa" fontSize={13} fontWeight={600}>
               {zone.name}

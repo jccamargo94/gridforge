@@ -163,6 +163,7 @@ export default function NodalDashboardPage() {
               zones={nodal.network.zones}
               branches={nodal.network.branches}
               generators={nodal.network.generators}
+              loads={nodal.network.loads}
               lmpRows={lmpQuery.data ?? []}
               hour={hour}
             />

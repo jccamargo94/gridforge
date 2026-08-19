@@ -57,3 +57,44 @@ def test_parse_demand_ddem_skips_excluded_rows():
     assert "SubArea Valle" in demand
     assert "Ecuador138" not in demand
     assert "Total" not in demand
+
+
+def _capacity_data_report():
+    return [
+        {
+            "dispatchedType": [
+                {
+                    "generatorTypes": [
+                        {
+                            "name": "Hidráulica",
+                            "elements": [
+                                {
+                                    "elementName": "GUATAPE",
+                                    "netEffectiveCapacity": "1000",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    ]
+
+
+def test_parse_generators_flat_data_report():
+    payload = {"dataReport": _capacity_data_report()}
+    gens = parse.parse_generators(payload, {}, {}, {}, {})
+    assert len(gens) == 1
+    assert gens[0]["name"] == "GUATAPE"
+    assert gens[0]["fuel"] == "hydro"
+
+
+def test_parse_generators_nested_data_report():
+    payload = {
+        "header": {"code": 200},
+        "data": {"dataReport": _capacity_data_report()},
+    }
+    gens = parse.parse_generators(payload, {}, {}, {}, {})
+    assert len(gens) == 1
+    assert gens[0]["name"] == "GUATAPE"
+    assert gens[0]["fuel"] == "hydro"

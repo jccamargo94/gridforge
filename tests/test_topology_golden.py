@@ -31,9 +31,13 @@ def test_golden_fixtures_build_valid_network():
 
 @pytest.mark.live
 def test_live_fetch_paratec(tmp_path):
-    from app.data.topology import fetch
+    from app.data.topology import fetch, parse
     from app.storage import LocalStorage
 
     storage = LocalStorage(str(tmp_path))
     raw = fetch.fetch_all(storage)
     assert "data" in raw["substations"]
+    gens = parse.parse_generators(
+        raw["capacity"], raw["thermal_fuel"], raw["hydro"], raw["solar"], raw["wind"]
+    )
+    assert len(gens) > 300

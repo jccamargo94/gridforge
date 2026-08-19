@@ -76,7 +76,9 @@ def parse_generators(
     # Capacity catalog is the authoritative per-element list with subarea.
     # Walk its nested dataReport[] structure to collect (name, capacity, subarea).
     gens: list[dict] = []
-    capacity_root = capacity_payload.get("dataReport", capacity_payload)
+    capacity_root = _data(capacity_payload)
+    if isinstance(capacity_root, dict):
+        capacity_root = capacity_root.get("dataReport")
     for plant_group in capacity_root if isinstance(capacity_root, list) else []:
         for dispatched in plant_group.get("dispatchedType", []):
             for gtype in dispatched.get("generatorTypes", []):

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArtifactDownloads } from "@/components/artifact-downloads";
 import { DispatchChart } from "@/components/dispatch-chart";
 import { LogViewer } from "@/components/log-viewer";
@@ -20,12 +21,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Activity,
   BarChart3,
   BatteryCharging,
   FileDown,
   Loader2,
+  Network,
   TrendingDown,
   TrendingUp,
   Zap,
@@ -110,6 +113,15 @@ export default function RunDetailPage() {
             {isRunning && <Loader2 className="size-3 animate-spin" />}
             {statusLabel(data.status, lang)}
           </span>
+          {data.nodal && (
+            <Link
+              href={`/runs/${id}/nodal`}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+            >
+              <Network className="size-3.5" />
+              {t("nodal.openDashboard")}
+            </Link>
+          )}
         </CardContent>
       </Card>
 

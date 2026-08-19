@@ -1,0 +1,5 @@
+{"data": [
+  {"name": "AGUABLANCA - ALFEREZ II 115 kV", "subStation": "AGUABLANCA - ALFEREZ II",
+   "ratedVoltage": "115", "thermalLimit": 600, "length": 5.63,
+   "typeLines": [{"reactance": 1.23, "length": 5.63}]}
+]}

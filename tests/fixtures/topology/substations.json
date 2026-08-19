@@ -1,0 +1,6 @@
+{"header": {"code": 200}, "data": [
+  {"elementName": "AGUABLANCA", "subAreaName": "SubArea Valle",
+   "voltageLevel": [115, 110], "latitude": 3.45, "longitude": -76.5},
+  {"elementName": "ALFEREZ II", "subAreaName": "SubArea Valle",
+   "voltageLevel": [115], "latitude": 3.46, "longitude": -76.51}
+]}

@@ -52,3 +52,9 @@ def test_fetch_all_caches_raw_json(tmp_path, monkeypatch):
     assert hits["n"] > 0
     assert hits["n"] == len(fetch.ENDPOINTS)  # second call made no HTTP request
     assert first == second
+
+
+def test_endpoints_includes_transmission_map():
+    assert fetch.ENDPOINTS["lines_map"] == (
+        "https://paratecbackend.xm.com.co/mapas/api/TransmissionMap/getLines"
+    )

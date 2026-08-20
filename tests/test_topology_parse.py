@@ -81,6 +81,17 @@ def _capacity_data_report():
     ]
 
 
+def test_parse_demand_pron_reads_en_rows_and_skips_pot():
+    text = (
+        "SubArea Valle,1,EN,100.0,101.0,102.0,103.0,104.0,105.0,106.0\n"
+        "SubArea Valle,1,POT,50.0,51.0,52.0,53.0,54.0,55.0,56.0\n"
+        "SubArea Valle,2,EN,200.0,0,0,0,0,0,0\n"
+    )
+    demand = parse.parse_demand(text, "pron")
+    assert demand["SubArea Valle"][0] == 100.0
+    assert demand["SubArea Valle"][1] == 200.0
+
+
 def test_parse_generators_flat_data_report():
     payload = {"dataReport": _capacity_data_report()}
     gens = parse.parse_generators(payload, {}, {}, {}, {})

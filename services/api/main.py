@@ -2,19 +2,25 @@ import json
 import os
 from datetime import date
 
+import httpx
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.data.actuals import load_reference_price
+from app.data.topology import service as topology_service
 from app.db import queries
 from app.db.session import get_engine, get_sessionmaker
 from app.nodal.network.schemas import NodalNetwork
 from app.schemas import BessScenario, DispatchLevel
 from app.storage import get_storage
 from services.api.auth import get_current_user_id
+
+TOPOLOGY_DATASET = "topology_network"
+TOPOLOGY_PARTITION = "colombia"
+TOPOLOGY_NETWORK_PATH = "topology/network.json"
 
 app = FastAPI(title="gridforge API")
 
@@ -78,6 +84,7 @@ class RunCreateRequest(BaseModel):
     compute_prices: bool = True
     scenario_id: str | None = None
     nodal_network: NodalNetwork | None = None
+    recompute_demand_shares: bool = False
 
 
 def _run_summary(run, case) -> dict:
@@ -158,6 +165,30 @@ def create_run(
         raise HTTPException(status_code=404, detail="scenario not found")
     if body.nodal_network is not None and body.level != DispatchLevel.lmp:
         raise HTTPException(status_code=400, detail="nodal_network is only valid for level lmp")
+    if body.recompute_demand_shares and body.nodal_network is None:
+        raise HTTPException(
+            status_code=400, detail="recompute_demand_shares requires nodal_network"
+        )
+
+    nodal_network_dict = body.nodal_network.model_dump() if body.nodal_network else None
+    if body.recompute_demand_shares:
+        zone_names = [z["name"] for z in nodal_network_dict["zones"]]
+        try:
+            shares, _source = topology_service.recompute_demand_shares(
+                get_storage("data"), body.dispatch_date, zone_names
+            )
+        except (httpx.HTTPStatusError, ValueError) as exc:
+            raise HTTPException(
+                status_code=422, detail=f"could not recompute demand shares: {exc}"
+            ) from exc
+        nodal_network_dict["demand_shares"] = shares
+        try:
+            NodalNetwork(**nodal_network_dict)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=422, detail=f"recomputed demand shares invalid: {exc}"
+            ) from exc
+
     run = queries.create_case_and_run(
         session,
         dispatch_date=body.dispatch_date,
@@ -166,9 +197,64 @@ def create_run(
         compute_prices=body.compute_prices,
         scenario_id=body.scenario_id,
         user_id=user_id,
-        nodal_network=body.nodal_network.model_dump() if body.nodal_network else None,
+        nodal_network=nodal_network_dict,
     )
     return {"run_id": run.id, "status": run.status}
+
+
+class TopologyScrapeRequest(BaseModel):
+    dispatch_date: date
+    demand_source: str = "ddem"
+
+
+@app.post("/topology/scrape")
+def scrape_topology(
+    body: TopologyScrapeRequest,
+    user_id: str = Depends(get_current_user_id),
+    session=Depends(get_session),
+):
+    """Fetch fresh PARATEC + XM data and overwrite the cached Colombian network.
+
+    Not yet wired to any frontend action — trigger manually (e.g. via curl)
+    until scrape scheduling/admin-gating is built. See README.
+    """
+    if body.demand_source not in ("ddem", "pron"):
+        raise HTTPException(status_code=400, detail="demand_source must be 'ddem' or 'pron'")
+    storage = get_storage("data")
+    try:
+        network, _extra = topology_service.scrape_topology(
+            storage, body.dispatch_date, demand_source=body.demand_source, scope="subarea"
+        )
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"PARATEC/XM fetch failed: {exc}") from exc
+    with storage.open(TOPOLOGY_NETWORK_PATH, "w") as fh:
+        json.dump(network.model_dump(), fh, indent=2, ensure_ascii=False)
+    queries.upsert_input_dataset(
+        session,
+        dataset=TOPOLOGY_DATASET,
+        partition_key=TOPOLOGY_PARTITION,
+        source=f"paratec:subarea:{body.demand_source}:{body.dispatch_date}",
+        row_count=len(network.zones),
+    )
+    return {
+        "zones": len(network.zones),
+        "generators": len(network.generators),
+        "branches": len(network.branches),
+    }
+
+
+@app.get("/topology/network")
+def get_topology_network(user_id: str = Depends(get_current_user_id), session=Depends(get_session)):
+    """Return the cached Colombian network last written by POST /topology/scrape."""
+    storage = get_storage("data")
+    if not storage.exists(TOPOLOGY_NETWORK_PATH):
+        raise HTTPException(
+            status_code=404, detail="no cached network yet; run POST /topology/scrape"
+        )
+    with storage.open(TOPOLOGY_NETWORK_PATH) as fh:
+        network = json.load(fh)
+    dataset = queries.get_input_dataset(session, TOPOLOGY_DATASET, TOPOLOGY_PARTITION)
+    return {"network": network, "scraped_at": dataset.fetched_at if dataset else None}
 
 
 @app.get("/runs")

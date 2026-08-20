@@ -5,7 +5,7 @@ from datetime import datetime
 
 import typer
 
-from app.data.topology import fetch, parse
+from app.data.topology import service
 from app.data.topology.builders import BUILDERS
 from app.storage import get_storage
 
@@ -26,24 +26,13 @@ def scrape_topology_cmd(
         raise typer.BadParameter(f"scope must be one of {sorted(BUILDERS)}, got {scope!r}")
     dispatch_date = datetime.strptime(d, "%Y-%m-%d").date()
     storage = get_storage(data_dir)
-    raw = fetch.fetch_all(storage, refresh=refresh)
-    demand_text = fetch.fetch_demand(storage, dispatch_date, demand_source)
-
-    subs = parse.parse_substations(raw["substations"])
-    lines = parse.parse_lines(raw["lines"])
-    map_lines = parse.parse_map_lines(raw["lines_map"])
-    gens = parse.parse_generators(
-        raw["capacity"],
-        raw["thermal_fuel"],
-        raw["hydro"],
-        raw["solar"],
-        raw["wind"],
-    )
-    demand = parse.parse_demand(demand_text, demand_source)
-
-    builder = BUILDERS[scope]
-    network, extra = builder(
-        subs, lines, gens, demand, map_lines=map_lines, demand_split=demand_split
+    network, extra = service.scrape_topology(
+        storage,
+        dispatch_date,
+        demand_source=demand_source,
+        demand_split=demand_split,
+        scope=scope,
+        refresh=refresh,
     )
 
     with storage.open(out, "w") as fh:

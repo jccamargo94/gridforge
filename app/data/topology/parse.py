@@ -158,9 +158,10 @@ def parse_demand(text: str, source: str) -> dict[str, list[float]]:
         else:
             # PRON_AREAS: Sub<nombre>,<hora>,<EN|POT>,<7 daily values>
             hour, _, values_text = rest.partition(",")
-            if not values_text.strip():
+            row_type, _, daily_values_text = values_text.partition(",")
+            if row_type.strip() != "EN" or not daily_values_text.strip():
                 continue
-            values = [float(x) for x in values_text.split(",") if x.strip()]
+            values = [float(x) for x in daily_values_text.split(",") if x.strip()]
             demand.setdefault(name, [0.0] * 24)
             h = int(hour.strip())
             if 1 <= h <= 24:

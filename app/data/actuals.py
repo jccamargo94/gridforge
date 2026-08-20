@@ -31,11 +31,11 @@ def load_actual_bolsa(dispatch_date: date, data_dir: str = "data") -> np.ndarray
 def load_reference_price(dispatch_date: date, level: str, data_dir: str = "data") -> np.ndarray:
     """Pick the evaluation reference for a run.
 
-    ideal -> real bolsa price (PrecBolsNaci), the value the ideal dispatch
-    actually determines; falls back to the iMAR MPO when the bolsa price is not
-    published yet (same calendar lag as demaCome). preideal -> iMAR MPO.
+    ideal/lmp -> real bolsa price (PrecBolsNaci): the value the ideal dispatch
+    determines, and the target the LMP weighted-average price is compared
+    against; falls back to iMAR MPO when not yet published. preideal -> iMAR MPO.
     """
-    if level == "ideal":
+    if level in ("ideal", "lmp"):
         try:
             return load_actual_bolsa(dispatch_date, data_dir=data_dir)
         except (FileNotFoundError, ValueError):

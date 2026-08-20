@@ -61,6 +61,27 @@ def parse_lines(payload: Any) -> list[dict]:
                 "reactance_ohm": reactance_ohm,
                 "kv": kv,
                 "rating": rating,
+                "subarea": row.get("subArea") or "",
+            }
+        )
+    return lines
+
+
+def parse_map_lines(payload: Any) -> list[dict]:
+    """Parse TransmissionMap/getLines GeoJSON into structured line endpoints.
+
+    Only identity fields (sub1/sub2 are exact substation elementName strings,
+    no free-text split needed). Electrical parameters aren't in this payload;
+    the build layer cross-references them from parse_lines() output by name.
+    """
+    lines = []
+    for feature in _data(payload):
+        props = feature["properties"]
+        lines.append(
+            {
+                "name": props["nameLine"],
+                "sub1": props["sub1"],
+                "sub2": props["sub2"],
             }
         )
     return lines

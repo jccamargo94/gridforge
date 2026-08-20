@@ -188,10 +188,9 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
               className="size-3.5"
             />
             {t("createRun.recomputeDemandShares")}
-            <Info
-              className="size-3.5 text-muted-foreground"
-              title={t("createRun.recomputeDemandSharesTooltip")}
-            />
+            <span title={t("createRun.recomputeDemandSharesTooltip")}>
+              <Info className="size-3.5 text-muted-foreground" />
+            </span>
           </label>
         </div>
       )}

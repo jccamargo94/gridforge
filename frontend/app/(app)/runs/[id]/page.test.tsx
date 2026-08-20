@@ -52,6 +52,7 @@ const NODAL_RUN: RunDetail = {
       branches: [{ name: "NC", from_zone: "norte", to_zone: "sur", reactance: 0.1, rating: 120 }],
       loads: [], demand_shares: { norte: 0.5, sur: 0.5 },
     },
+    price_series: null,
     artifacts: {
       lmp: true, dispatch: true, branch_flows: true, settlement_status_quo: true,
       settlement_lmp: true, comparison: true, summary: true,

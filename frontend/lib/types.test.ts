@@ -33,13 +33,14 @@ describe("nodal types", () => {
         branches: [{ name: "NC", from_zone: "norte", to_zone: "centro", reactance: 0.1, rating: 120 }],
         loads: [], demand_shares: { norte: 1 },
       },
+      price_series: null,
       artifacts: { lmp: true, dispatch: true, branch_flows: true, settlement_status_quo: true, settlement_lmp: true, comparison: true, summary: true },
     };
     expect(result.network.zones[0].name).toBe("norte");
   });
 
   it("shapes LMP and nodal dispatch rows", () => {
-    const lmp: LmpRow = { timestamp: "2024-04-18 00:00", bus: "norte", lmp: 20 };
+    const lmp: LmpRow = { timestamp: "2024-04-18 00:00", bus: "norte", lmp: 20, lmp_avg: 20, lmp_congestion: 0 };
     const row: NodalDispatchRow = { generator: "G_N", zone: "norte", fuel: "hydro", hour: 0, dispatch_mw: 100 };
     expect(lmp.bus).toBe("norte");
     expect(row.dispatch_mw).toBe(100);

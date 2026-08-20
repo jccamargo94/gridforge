@@ -48,6 +48,7 @@ const NODAL_RUN: RunDetail = {
       branches: [{ name: "NC", from_zone: "norte", to_zone: "sur", reactance: 0.1, rating: 120 }],
       loads: [], demand_shares: { norte: 0.5, sur: 0.5 },
     },
+    price_series: null,
     artifacts: {
       lmp: true, dispatch: true, branch_flows: true, settlement_status_quo: true,
       settlement_lmp: true, comparison: true, summary: true,
@@ -56,8 +57,8 @@ const NODAL_RUN: RunDetail = {
 };
 
 const LMP_ROWS = Array.from({ length: 24 }, (_, hour) => [
-  { timestamp: `2024-04-18 ${String(hour).padStart(2, "0")}:00`, bus: "norte", lmp: 20 + hour },
-  { timestamp: `2024-04-18 ${String(hour).padStart(2, "0")}:00`, bus: "sur", lmp: 30 + hour },
+  { timestamp: `2024-04-18 ${String(hour).padStart(2, "0")}:00`, bus: "norte", lmp: 20 + hour, lmp_avg: 20 + hour, lmp_congestion: 0 },
+  { timestamp: `2024-04-18 ${String(hour).padStart(2, "0")}:00`, bus: "sur", lmp: 30 + hour, lmp_avg: 30 + hour, lmp_congestion: 0 },
 ]).flat();
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

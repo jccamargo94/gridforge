@@ -23,9 +23,9 @@ describe("hourFromTimestamp", () => {
 
 describe("toPriceCurveData", () => {
   const rows = [
-    { timestamp: "H00", bus: "norte", lmp: 20 },
-    { timestamp: "H01", bus: "norte", lmp: 21 },
-    { timestamp: "H00", bus: "sur", lmp: 30 },
+    { timestamp: "H00", bus: "norte", lmp: 20, lmp_avg: 20, lmp_congestion: 0 },
+    { timestamp: "H01", bus: "norte", lmp: 21, lmp_avg: 21, lmp_congestion: 0 },
+    { timestamp: "H00", bus: "sur", lmp: 30, lmp_avg: 30, lmp_congestion: 0 },
   ];
   it("builds 24 hourly points with one series per zone", () => {
     const { data, seriesKeys } = toPriceCurveData(rows);
@@ -68,8 +68,8 @@ describe("toBranchFlowSeries", () => {
 
 describe("zoneLmpAtHour", () => {
   const rows = [
-    { timestamp: "H00", bus: "norte", lmp: 20 },
-    { timestamp: "H01", bus: "norte", lmp: 21 },
+    { timestamp: "H00", bus: "norte", lmp: 20, lmp_avg: 20, lmp_congestion: 0 },
+    { timestamp: "H01", bus: "norte", lmp: 21, lmp_avg: 21, lmp_congestion: 0 },
   ];
   it("returns the lmp for a zone and hour", () => {
     expect(zoneLmpAtHour(rows, "norte", 0)).toBe(20);

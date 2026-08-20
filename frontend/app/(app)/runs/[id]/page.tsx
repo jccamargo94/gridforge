@@ -80,6 +80,7 @@ export default function RunDetailPage() {
   }
 
   const isRunning = data.status === "running";
+  const isNodal = Boolean(data.nodal);
 
   return (
     <div className="flex flex-col gap-6">
@@ -211,23 +212,43 @@ export default function RunDetailPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("runDetail.dispatchChart")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DispatchChart rows={dispatchQuery.data ?? []} lang={lang} />
-        </CardContent>
-      </Card>
+      {isNodal ? (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+            <div>
+              <p className="font-heading text-sm font-bold">{t("runDetail.nodalCtaTitle")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t("runDetail.nodalCtaBody")}</p>
+            </div>
+            <Link
+              href={`/runs/${id}/nodal`}
+              className={cn(buttonVariants({ variant: "default", size: "default" }), "gap-1.5")}
+            >
+              <Network className="size-4" />
+              {t("nodal.openDashboard")}
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("runDetail.dispatchChart")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DispatchChart rows={dispatchQuery.data ?? []} lang={lang} />
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("runDetail.pricesChart")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PriceSeriesChart points={data.price_series} />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("runDetail.pricesChart")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PriceSeriesChart points={data.price_series} />
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {data.artifacts.marginal_plants && (
         <Card>
@@ -247,14 +268,16 @@ export default function RunDetailPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("runDetail.downloadResults")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ArtifactDownloads runId={data.run_id} artifacts={data.artifacts} />
-        </CardContent>
-      </Card>
+      {!isNodal && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("runDetail.downloadResults")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ArtifactDownloads runId={data.run_id} artifacts={data.artifacts} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

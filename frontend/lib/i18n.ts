@@ -54,6 +54,8 @@ const dict: Record<Lang, Record<string, string>> = {
 
     "runDetail.loading": "Cargando detalles...",
     "runDetail.dispatchChart": "Despacho por generador",
+    "runDetail.nodalCtaTitle": "Esta es una corrida nodal (LMP)",
+    "runDetail.nodalCtaBody": "Precios por zona, despacho por planta, flujos de rama y descargas viven en el analisis nodal.",
     "runDetail.downloadResults": "Descargar resultados",
     "runDetail.solverLog": "Log del solver",
     "runDetail.rmse": "RMSE",
@@ -244,6 +246,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "nodal.artifact.comparison": "Comparacion CSV",
     "nodal.artifact.summary": "Resumen JSON",
 
+    "table.rowsPerPage": "Filas por pagina",
+    "table.pageOf": "Pagina {page} de {total}",
+    "table.prev": "Anterior",
+    "table.next": "Siguiente",
+
     "log.loading": "Cargando log...",
     "log.empty": "Sin logs todavia.",
 
@@ -304,6 +311,8 @@ const dict: Record<Lang, Record<string, string>> = {
 
     "runDetail.loading": "Loading run details...",
     "runDetail.dispatchChart": "Dispatch by Generator",
+    "runDetail.nodalCtaTitle": "This is a nodal (LMP) run",
+    "runDetail.nodalCtaBody": "Per-zone prices, per-plant dispatch, branch flows and downloads live in the nodal analysis.",
     "runDetail.downloadResults": "Download Results",
     "runDetail.solverLog": "Solver Log",
     "runDetail.rmse": "RMSE",
@@ -493,6 +502,11 @@ const dict: Record<Lang, Record<string, string>> = {
     "nodal.artifact.settlement_lmp": "Settlement B (LMP) CSV",
     "nodal.artifact.comparison": "Comparison CSV",
     "nodal.artifact.summary": "Summary JSON",
+
+    "table.rowsPerPage": "Rows per page",
+    "table.pageOf": "Page {page} of {total}",
+    "table.prev": "Previous",
+    "table.next": "Next",
 
     "log.loading": "Loading log...",
     "log.empty": "No logs yet.",

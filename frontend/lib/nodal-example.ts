@@ -1,0 +1,63 @@
+import type { NodalNetwork } from "./types";
+
+export const NODAL_EXAMPLE_NETWORK: NodalNetwork = {
+  name: "three_zone",
+  baseMVA: 100,
+  reference_zone: "norte",
+  zones: [
+    { name: "norte", base_kv: 230 },
+    { name: "centro", base_kv: 230 },
+    { name: "sur", base_kv: 230 },
+  ],
+  generators: [
+    {
+      name: "G_N",
+      zone: "norte",
+      p_min: 0,
+      p_max: 500,
+      marginal_cost: 20,
+      no_load_cost: 0,
+      fuel: "hydro",
+      min_up_time: 1,
+      min_down_time: 1,
+      initial_status: 1,
+      ramp_rate: null,
+    },
+    {
+      name: "G_C",
+      zone: "centro",
+      p_min: 0,
+      p_max: 300,
+      marginal_cost: 80,
+      no_load_cost: 0,
+      fuel: "gas",
+      min_up_time: 1,
+      min_down_time: 1,
+      initial_status: -1,
+      ramp_rate: null,
+    },
+    {
+      name: "G_S",
+      zone: "sur",
+      p_min: 0,
+      p_max: 300,
+      marginal_cost: 120,
+      no_load_cost: 0,
+      fuel: "coal",
+      min_up_time: 1,
+      min_down_time: 1,
+      initial_status: -1,
+      ramp_rate: null,
+    },
+  ],
+  branches: [
+    { name: "NC", from_zone: "norte", to_zone: "centro", reactance: 0.1, rating: 400 },
+    { name: "CS", from_zone: "centro", to_zone: "sur", reactance: 0.1, rating: 400 },
+  ],
+  loads: [
+    { zone: "norte", p_load: Array(24).fill(100) },
+    { zone: "centro", p_load: Array(24).fill(100) },
+    { zone: "sur", p_load: Array(24).fill(100) },
+  ],
+  demand_shares: {},
+};

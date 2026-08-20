@@ -5,7 +5,7 @@ vi.mock("./supabase", () => ({
 }));
 
 import { supabase } from "./supabase";
-import { createRun, createScenario, downloadRunArtifact, getRunDispatch, getRunLog, getRunMarginalPlants, listRuns } from "./api-client";
+import { createRun, createScenario, downloadNodalArtifact, downloadRunArtifact, getRunDispatch, getRunLog, getRunMarginalPlants, getRunNodalArtifact, listRuns } from "./api-client";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -180,5 +180,57 @@ describe("api-client", () => {
     const log = await getRunLog("run-1");
 
     expect(log).toBeNull();
+  });
+});
+
+describe("getRunNodalArtifact", () => {
+  it("fetches nodal artifact rows with auth header", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true, status: 200, statusText: "OK",
+      json: async () => [{ timestamp: "2024-04-18 00:00", bus: "norte", lmp: 20 }],
+    } as never);
+    const rows = await getRunNodalArtifact<{ timestamp: string; bus: string; lmp: number }[]>(
+      "run-1", "lmp",
+    );
+    expect(rows).toEqual([{ timestamp: "2024-04-18 00:00", bus: "norte", lmp: 20 }]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/runs/run-1/nodal/lmp"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer tok-123" }),
+      }),
+    );
+  });
+
+  it("parses summary artifact as an object", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true, status: 200, statusText: "OK",
+      json: async () => ({ metrics: { total_cost: 100 } }),
+    } as never);
+    const summary = await getRunNodalArtifact<{ metrics: Record<string, number> }>(
+      "run-1", "summary",
+    );
+    expect(summary.metrics.total_cost).toBe(100);
+  });
+});
+
+describe("downloadNodalArtifact", () => {
+  it("downloads a nodal artifact blob", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true, status: 200, statusText: "OK",
+      blob: async () => new Blob(["a,b\n1,2"]),
+    } as never);
+    const blob = await downloadNodalArtifact("run-1", "branch_flows");
+    expect(blob).toBeInstanceOf(Blob);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/runs/run-1/download/nodal/branch_flows"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer tok-123" }),
+      }),
+    );
+  });
+
+  it("throws on error response", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" } as never);
+    await expect(downloadNodalArtifact("run-1", "lmp")).rejects.toThrow("404 Not Found");
   });
 });

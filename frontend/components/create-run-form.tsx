@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NodalNetworkEditor } from "@/components/nodal-network-editor";
 import {
   Select,
   SelectContent,
@@ -11,14 +12,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRun, listScenarios } from "@/lib/api-client";
-import type { CreateRunRequest, DispatchLevel } from "@/lib/types";
+import type { CreateRunRequest, DispatchLevel, NodalNetwork } from "@/lib/types";
 import { useT } from "@/lib/i18n-context";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
   Calendar,
   Cpu,
   Layers,
+  Network,
   Play,
   Workflow,
 } from "lucide-react";
@@ -28,12 +31,17 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
   const [level, setLevel] = useState<DispatchLevel>("preideal");
   const [solver, setSolver] = useState("cbc");
   const [scenarioId, setScenarioId] = useState("");
+  const [network, setNetwork] = useState<NodalNetwork | null>(null);
+  const router = useRouter();
   const t = useT();
 
   const scenariosQuery = useQuery({ queryKey: ["scenarios"], queryFn: listScenarios });
   const mutation = useMutation({
     mutationFn: (variables: CreateRunRequest) => createRun(variables),
-    onSuccess: onCreated,
+    onSuccess: (data) => {
+      router.push(`/runs/${data.run_id}`);
+      onCreated();
+    },
   });
 
   function handleSubmit(e: FormEvent) {
@@ -43,6 +51,7 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
       level,
       solver,
       scenario_id: scenarioId || null,
+      nodal_network: level === "lmp" ? network : null,
     });
   }
 
@@ -81,6 +90,7 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
             <SelectContent>
               <SelectItem value="preideal">preideal</SelectItem>
               <SelectItem value="ideal">ideal</SelectItem>
+              <SelectItem value="lmp">lmp</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-[0.7rem] text-muted-foreground">
@@ -140,13 +150,31 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
 
         <Button
           type="submit"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || (level === "lmp" && !network)}
           className="bg-amber-500 text-black hover:bg-amber-400 w-full sm:w-auto"
         >
           <Play className="size-3.5" />
           {mutation.isPending ? t("createRun.creating") : t("createRun.submit")}
         </Button>
       </div>
+
+      {level === "lmp" && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="nodal_network_json" className="flex items-center gap-1.5">
+              <Network className="size-3.5 text-muted-foreground" />
+              {t("createRun.nodalNetwork")}
+            </Label>
+            <p className="text-[0.7rem] text-muted-foreground">
+              {t("createRun.nodalNetworkHelp")}
+            </p>
+          </div>
+          <NodalNetworkEditor value={network} onChange={setNetwork} />
+          {!network && (
+            <p className="text-xs text-red-400">{t("createRun.nodalNetworkRequired")}</p>
+          )}
+        </div>
+      )}
 
       {mutation.isError && (
         <p

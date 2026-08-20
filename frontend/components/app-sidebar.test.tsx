@@ -4,7 +4,10 @@ import { ThemeProvider } from "@/lib/theme-context";
 import { I18nProvider } from "@/lib/i18n-context";
 import { AppSidebar } from "./app-sidebar";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/runs" }));
+const pathname = { current: "/runs" };
+vi.mock("next/navigation", () => ({
+  usePathname: () => pathname.current,
+}));
 
 const signOut = vi.fn();
 vi.mock("@/lib/auth-context", () => ({ useAuth: () => ({ signOut }) }));
@@ -37,5 +40,25 @@ describe("AppSidebar", () => {
     renderSidebar();
     screen.getByRole("button", { name: /salir/i }).click();
     expect(signOut).toHaveBeenCalled();
+  });
+
+  it("shows a Nodal nav item linking to /nodal", () => {
+    render(
+      <ThemeProvider><I18nProvider><AppSidebar /></I18nProvider></ThemeProvider>,
+    );
+    const link = screen.getByRole("link", { name: /nodal/i });
+    expect(link).toHaveAttribute("href", "/nodal");
+  });
+
+  it("marks the Nodal item active on /nodal", () => {
+    pathname.current = "/nodal";
+    render(<ThemeProvider><I18nProvider><AppSidebar /></I18nProvider></ThemeProvider>);
+    expect(screen.getByRole("link", { name: /nodal/i })).toHaveClass("text-amber-400");
+  });
+
+  it("marks the Nodal item active on a nodal dashboard route", () => {
+    pathname.current = "/runs/some-id/nodal";
+    render(<ThemeProvider><I18nProvider><AppSidebar /></I18nProvider></ThemeProvider>);
+    expect(screen.getByRole("link", { name: /nodal/i })).toHaveClass("text-amber-400");
   });
 });

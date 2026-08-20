@@ -15,6 +15,7 @@ function makeRun(overrides: Partial<RunSummary>): RunSummary {
     started_at: null,
     finished_at: null,
     error: null,
+    nodal: null,
     ...overrides,
   };
 }

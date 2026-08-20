@@ -128,6 +128,19 @@ def _price_series(run, case) -> list[dict] | None:
     return df.to_dict(orient="records")
 
 
+def _nodal_summary(session, run_id: str) -> dict | None:
+    nodal = queries.get_nodal_result(session, run_id)
+    if nodal is None or not nodal.network:
+        return None
+    net = nodal.network
+    return {
+        "network_name": net.get("name"),
+        "zones": len(net.get("zones", [])),
+        "generators": len(net.get("generators", [])),
+        "branches": len(net.get("branches", [])),
+    }
+
+
 def _get_owned_run(session, run_id: str, user_id: str):
     run = queries.get_run(session, run_id)
     if run is None or run.user_id != user_id:
@@ -161,7 +174,13 @@ def create_run(
 @app.get("/runs")
 def list_runs(user_id: str = Depends(get_current_user_id), session=Depends(get_session)):
     runs = queries.list_runs_for_user(session, user_id)
-    return [_run_summary(r, queries.get_case(session, r.case_id)) for r in runs]
+    return [
+        {
+            **_run_summary(r, queries.get_case(session, r.case_id)),
+            "nodal": _nodal_summary(session, r.id),
+        }
+        for r in runs
+    ]
 
 
 @app.get("/runs/{run_id}")

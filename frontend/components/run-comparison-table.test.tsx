@@ -18,6 +18,7 @@ function makeRun(overrides: Partial<RunDetail>): RunDetail {
     metrics: null,
     artifacts: { dispatch: false, prices: false, bess: false, marginal_plants: false },
     price_series: null,
+    nodal: null,
     ...overrides,
   };
 }

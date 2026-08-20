@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.data.topology.builders.node import build_node_network
+from app.data.topology.builders.subarea import build_subarea_network
 from app.nodal.network.schemas import NodalNetwork
 
 
@@ -29,6 +30,7 @@ def build_area_network(
 
 
 BUILDERS = {
+    "subarea": build_subarea_network,
     "node": build_node_network,
     "area": build_area_network,
 }

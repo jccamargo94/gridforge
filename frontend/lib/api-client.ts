@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario } from "./types";
+import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -81,6 +81,17 @@ export async function getRunNodalArtifact<T>(
   artifact: NodalArtifactName,
 ): Promise<T> {
   return request<T>(`/runs/${id}/nodal/${artifact}`);
+}
+
+export function getTopologyNetwork(): Promise<TopologyNetworkResponse> {
+  return request<TopologyNetworkResponse>("/topology/network");
+}
+
+export function scrapeTopology(dispatchDate: string): Promise<TopologyScrapeResponse> {
+  return request("/topology/scrape", {
+    method: "POST",
+    body: JSON.stringify({ dispatch_date: dispatchDate, demand_source: "ddem" }),
+  });
 }
 
 export async function downloadNodalArtifact(

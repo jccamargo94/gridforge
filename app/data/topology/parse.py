@@ -61,6 +61,27 @@ def parse_lines(payload: Any) -> list[dict]:
                 "reactance_ohm": reactance_ohm,
                 "kv": kv,
                 "rating": rating,
+                "subarea": row.get("subArea") or "",
+            }
+        )
+    return lines
+
+
+def parse_map_lines(payload: Any) -> list[dict]:
+    """Parse TransmissionMap/getLines GeoJSON into structured line endpoints.
+
+    Only identity fields (sub1/sub2 are exact substation elementName strings,
+    no free-text split needed). Electrical parameters aren't in this payload;
+    the build layer cross-references them from parse_lines() output by name.
+    """
+    lines = []
+    for feature in _data(payload):
+        props = feature["properties"]
+        lines.append(
+            {
+                "name": props["nameLine"],
+                "sub1": props["sub1"],
+                "sub2": props["sub2"],
             }
         )
     return lines
@@ -137,9 +158,10 @@ def parse_demand(text: str, source: str) -> dict[str, list[float]]:
         else:
             # PRON_AREAS: Sub<nombre>,<hora>,<EN|POT>,<7 daily values>
             hour, _, values_text = rest.partition(",")
-            if not values_text.strip():
+            row_type, _, daily_values_text = values_text.partition(",")
+            if row_type.strip() != "EN" or not daily_values_text.strip():
                 continue
-            values = [float(x) for x in values_text.split(",") if x.strip()]
+            values = [float(x) for x in daily_values_text.split(",") if x.strip()]
             demand.setdefault(name, [0.0] * 24)
             h = int(hour.strip())
             if 1 <= h <= 24:

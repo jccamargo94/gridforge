@@ -81,6 +81,17 @@ def _capacity_data_report():
     ]
 
 
+def test_parse_demand_pron_reads_en_rows_and_skips_pot():
+    text = (
+        "SubArea Valle,1,EN,100.0,101.0,102.0,103.0,104.0,105.0,106.0\n"
+        "SubArea Valle,1,POT,50.0,51.0,52.0,53.0,54.0,55.0,56.0\n"
+        "SubArea Valle,2,EN,200.0,0,0,0,0,0,0\n"
+    )
+    demand = parse.parse_demand(text, "pron")
+    assert demand["SubArea Valle"][0] == 100.0
+    assert demand["SubArea Valle"][1] == 200.0
+
+
 def test_parse_generators_flat_data_report():
     payload = {"dataReport": _capacity_data_report()}
     gens = parse.parse_generators(payload, {}, {}, {}, {})
@@ -98,3 +109,49 @@ def test_parse_generators_nested_data_report():
     assert len(gens) == 1
     assert gens[0]["name"] == "GUATAPE"
     assert gens[0]["fuel"] == "hydro"
+
+
+def test_parse_lines_includes_own_subarea():
+    payload = {
+        "data": [
+            {
+                "name": "AGUABLANCA - ALFEREZ II 1 115 kV",
+                "subStation": "AGUABLANCA - ALFEREZ II",
+                "subArea": "SubArea Valle",
+                "ratedVoltage": "115",
+                "thermalLimit": 600,
+                "length": 5.63,
+                "typeLines": [{"reactance": 1.23, "length": 5.63}],
+            }
+        ]
+    }
+    lines = parse.parse_lines(payload)
+    assert lines[0]["subarea"] == "SubArea Valle"
+
+
+def test_parse_map_lines_extracts_structured_endpoints():
+    payload = {
+        "data": [
+            {
+                "type": "Feature",
+                "properties": {
+                    "nameLine": "CALLE67 - LA PAZ (BOGOTA) 1 115 kV",
+                    "sub1": "CALLE67",
+                    "sub2": "LA PAZ (BOGOTA)",
+                    "subArea1": 2,
+                    "subArea2": 2,
+                    "emergencyLimit": 920,
+                    "ratedCurrent": 800,
+                },
+                "geometry": {"type": "LineString", "coordinates": [[-74.06, 4.65], [-74.12, 4.63]]},
+            }
+        ]
+    }
+    lines = parse.parse_map_lines(payload)
+    assert lines == [
+        {
+            "name": "CALLE67 - LA PAZ (BOGOTA) 1 115 kV",
+            "sub1": "CALLE67",
+            "sub2": "LA PAZ (BOGOTA)",
+        }
+    ]

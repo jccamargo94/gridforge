@@ -1,0 +1,5 @@
+{"header": {"code": 200}, "data": [
+  {"elementName": "A1", "subAreaName": "SubArea Valle", "voltageLevel": [230], "latitude": 3.4, "longitude": -76.5},
+  {"elementName": "A2", "subAreaName": "SubArea Valle", "voltageLevel": [115], "latitude": 3.5, "longitude": -76.5},
+  {"elementName": "B1", "subAreaName": "SubArea Bogota", "voltageLevel": [230], "latitude": 4.6, "longitude": -74.1}
+]}

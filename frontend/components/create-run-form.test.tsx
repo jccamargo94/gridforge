@@ -11,6 +11,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/api-client", () => ({
   createRun: vi.fn().mockResolvedValue({ run_id: "r1", status: "pending" }),
   listScenarios: vi.fn().mockResolvedValue([]),
+  getTopologyNetwork: vi.fn(),
+  scrapeTopology: vi.fn(),
 }));
 
 import { createRun } from "@/lib/api-client";
@@ -103,6 +105,25 @@ describe("CreateRunForm", () => {
             reference_zone: "norte",
           }),
         })
+      )
+    );
+  });
+
+  it("sends recompute_demand_shares true when the checkbox is checked for an lmp run", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CreateRunForm onCreated={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/fecha/i), { target: { value: "2024-04-18" } });
+    const levelTrigger = screen.getByRole("combobox", { name: /nivel/i });
+    await user.click(levelTrigger);
+    await user.click(await screen.findByRole("option", { name: "lmp" }));
+    await user.click(screen.getByRole("button", { name: /cargar red de ejemplo/i }));
+    await user.click(screen.getByRole("checkbox", { name: /calcular demand-share por fecha/i }));
+    await user.click(screen.getByRole("button", { name: /crear ejecucion/i }));
+
+    await waitFor(() =>
+      expect(createRun).toHaveBeenCalledWith(
+        expect.objectContaining({ recompute_demand_shares: true })
       )
     );
   });

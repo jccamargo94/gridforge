@@ -446,6 +446,46 @@ técnicos del sistema (subestaciones, líneas, catálogo de generación) desde P
 y la demanda por subárea desde XM, y escribe un `NodalNetwork` JSON consumible por
 `run -t lmp --nodal-network <archivo>`.
 
+`--scope` controla la granularidad de zona (default `subarea`):
+
+- `subarea` (default): una zona por subárea operativa (21 zonas domésticas). Las
+  ramas inter-subárea salen de `TransmissionMap/getLines`; las líneas dentro de
+  una misma subárea se fusionan y quedan resumidas (no como zonas del grafo) en
+  `topology/network_summary.json`.
+- `node`: una zona por subestación PARATEC (500+ zonas) — el comportamiento
+  original, útil para pruebas de carga/desempeño del motor con la topología
+  completa.
+- `area`: no implementado aún — PARATEC no tiene datos de línea a nivel de las
+  8 áreas operativas.
+
+#### Obtener la red colombiana desde el backend
+
+No scrapeamos por-usuario: el backend mantiene **una** red cacheada
+(`data/topology/network.json`, scope `subarea`) que se actualiza manualmente
+via un endpoint disparador — no hay todavia UI ni scheduling automatico para
+esto (ver `docs/superpowers/specs/2026-08-20-topology-subarea-scope-design.md`).
+
+Refrescar la red cacheada:
+
+```bash
+curl -X POST http://localhost:8000/topology/scrape \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"dispatch_date": "2024-04-18", "demand_source": "ddem"}'
+```
+
+Consultar la red cacheada y cuando fue scrapeada:
+
+```bash
+curl http://localhost:8000/topology/network -H "Authorization: Bearer <token>"
+```
+
+`POST /runs` acepta `recompute_demand_shares: true` (junto a `nodal_network`)
+para recalcular `demand_shares` contra la demanda real de `dispatch_date` en
+vez de usar el promedio congelado al momento del scrape — util porque una
+corrida `lmp` puede caer en una fecha historica (dDEM) o futura (pronostico
+PRON), y la proporcion de demanda por zona cambia entre ambas.
+
 ### Backend API, worker y migraciones (Fase 3)
 
 Desde Fase 3 el repo tambien incluye un backend HTTP (`services/api/`) y un
@@ -471,7 +511,9 @@ Migraciones (requiere `DATABASE_URL` en el entorno):
 uv run alembic upgrade head
 ```
 
-La tabla `input_datasets` es creada por la migracion 0003 pero su logica de lectura/escritura (ingesta desde XM) aun no esta integrada en `app/`; es un artefacto fundacional de Fase 6 pendiente.
+La tabla `input_datasets` es creada por la migracion 0003; `POST /topology/scrape`
+la usa para registrar el `fetched_at` de la red cacheada (`dataset="topology_network"`),
+pero el resto de la ingesta general desde XM aun no esta integrada en `app/`.
 
 Recuperacion manual de una corrida atascada: si una fila `runs` queda en
 `running` de forma permanente (p. ej. el worker murio a mitad de un solve),

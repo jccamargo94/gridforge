@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { getTopologyNetwork, scrapeTopology } from "@/lib/api-client";
 import { NODAL_EXAMPLE_NETWORK } from "@/lib/nodal-example";
 import type { NodalNetwork } from "@/lib/types";
 import { useT } from "@/lib/i18n-context";
@@ -136,6 +137,8 @@ export function NodalNetworkEditor({
   const [text, setText] = useState(() => (value ? JSON.stringify(value, null, 2) : ""));
   const result = useMemo(() => validateNodalNetwork(text), [text]);
   const valid = result.errors.length === 0;
+  const [colombiaStatus, setColombiaStatus] = useState<"idle" | "loading" | "scraping">("idle");
+  const [colombiaError, setColombiaError] = useState<string | null>(null);
 
   function handleTextChange(next: string) {
     setText(next);
@@ -145,6 +148,32 @@ export function NodalNetworkEditor({
   function loadExample() {
     setText(JSON.stringify(NODAL_EXAMPLE_NETWORK, null, 2));
     onChange(NODAL_EXAMPLE_NETWORK);
+  }
+
+  async function loadColombianNetwork() {
+    setColombiaStatus("loading");
+    setColombiaError(null);
+    try {
+      const { network } = await getTopologyNetwork();
+      setText(JSON.stringify(network, null, 2));
+      onChange(network);
+    } catch (err) {
+      setColombiaError((err as Error).message);
+    } finally {
+      setColombiaStatus("idle");
+    }
+  }
+
+  async function scrapeAndLoadColombianNetwork() {
+    setColombiaStatus("scraping");
+    setColombiaError(null);
+    try {
+      await scrapeTopology(new Date().toISOString().slice(0, 10));
+      await loadColombianNetwork();
+    } catch (err) {
+      setColombiaError((err as Error).message);
+      setColombiaStatus("idle");
+    }
   }
 
   return (
@@ -161,6 +190,24 @@ export function NodalNetworkEditor({
         <Button type="button" variant="outline" size="sm" onClick={loadExample}>
           {t("nodalNetwork.example")}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={loadColombianNetwork}
+          disabled={colombiaStatus !== "idle"}
+        >
+          {colombiaStatus === "loading" ? t("nodalNetwork.loading") : t("nodalNetwork.loadColombia")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={scrapeAndLoadColombianNetwork}
+          disabled={colombiaStatus !== "idle"}
+        >
+          {colombiaStatus === "scraping" ? t("nodalNetwork.scraping") : t("nodalNetwork.scrapeColombia")}
+        </Button>
         <p
           className={
             valid
@@ -171,6 +218,11 @@ export function NodalNetworkEditor({
           {valid ? t("nodalNetwork.valid") : t("nodalNetwork.invalid")}
         </p>
       </div>
+      {colombiaError && (
+        <p role="alert" className="text-xs text-red-400">
+          {colombiaError}
+        </p>
+      )}
       {!valid && result.errors.length > 0 && (
         <div
           role="alert"

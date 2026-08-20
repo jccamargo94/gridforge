@@ -1,0 +1,14 @@
+{"data": [
+  {"name": "A1 - B1 1", "subStation": "A1 - B1", "subArea": "SubArea Valle",
+   "ratedVoltage": "230", "thermalLimit": 251, "length": 10.0,
+   "typeLines": [{"reactance": 5.0, "length": 10.0}]},
+  {"name": "A1 - A2 1", "subStation": "A1 - A2", "subArea": "SubArea Valle",
+   "ratedVoltage": "115", "thermalLimit": 401, "length": 10.0,
+   "typeLines": [{"reactance": 2.0, "length": 10.0}]},
+  {"name": "A2 - GHOST_TAP 1", "subStation": "A2 - GHOST_TAP", "subArea": "SubArea Valle",
+   "ratedVoltage": "115", "thermalLimit": 201, "length": 10.0,
+   "typeLines": [{"reactance": 3.0, "length": 10.0}]},
+  {"name": "FOO - BAR 1", "subStation": "FOO - BAR", "subArea": "SubArea Valle",
+   "ratedVoltage": "115", "thermalLimit": 100, "length": 10.0,
+   "typeLines": [{"reactance": 1.0, "length": 10.0}]}
+]}

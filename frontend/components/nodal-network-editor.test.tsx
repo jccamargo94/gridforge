@@ -1,8 +1,15 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/lib/i18n-context";
 import { NodalNetworkEditor } from "./nodal-network-editor";
 import type { NodalNetwork } from "@/lib/types";
+
+vi.mock("@/lib/api-client", () => ({
+  getTopologyNetwork: vi.fn(),
+  scrapeTopology: vi.fn(),
+}));
+
+import { getTopologyNetwork, scrapeTopology } from "@/lib/api-client";
 
 function renderEditor() {
   const onChange = vi.fn();
@@ -97,5 +104,57 @@ describe("NodalNetworkEditor", () => {
 
     expect(screen.getByText(/exactamente 24 numeros/i)).toBeInTheDocument();
     expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it("loads the cached Colombian network and calls onChange", async () => {
+    const colombianNetwork = {
+      name: "colombia",
+      baseMVA: 100,
+      reference_zone: "SubArea Valle",
+      zones: [{ name: "SubArea Valle", base_kv: 0 }],
+      generators: [],
+      branches: [],
+      loads: [],
+      demand_shares: { "SubArea Valle": 1.0 },
+    };
+    vi.mocked(getTopologyNetwork).mockResolvedValue({
+      network: colombianNetwork,
+      scraped_at: "2026-08-20T00:00:00Z",
+    });
+    const { onChange } = renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: /cargar red colombiana/i }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(colombianNetwork));
+  });
+
+  it("shows an error when no Colombian network is cached yet", async () => {
+    vi.mocked(getTopologyNetwork).mockRejectedValue(new Error("404: not found"));
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: /cargar red colombiana/i }));
+
+    expect(await screen.findByText("404: not found")).toBeInTheDocument();
+  });
+
+  it("triggers a scrape then loads the refreshed network", async () => {
+    const scraped = {
+      name: "colombia",
+      baseMVA: 100,
+      reference_zone: "SubArea Valle",
+      zones: [{ name: "SubArea Valle", base_kv: 0 }],
+      generators: [],
+      branches: [],
+      loads: [],
+      demand_shares: { "SubArea Valle": 1.0 },
+    };
+    vi.mocked(scrapeTopology).mockResolvedValue({ zones: 1, generators: 0, branches: 0 });
+    vi.mocked(getTopologyNetwork).mockResolvedValue({ network: scraped, scraped_at: "now" });
+    const { onChange } = renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar red colombiana/i }));
+
+    await waitFor(() => expect(scrapeTopology).toHaveBeenCalled());
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(scraped));
   });
 });

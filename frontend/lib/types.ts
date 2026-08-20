@@ -98,6 +98,7 @@ export interface CreateRunRequest {
   compute_prices?: boolean;
   scenario_id?: string | null;
   nodal_network?: NodalNetwork | null;
+  recompute_demand_shares?: boolean;
 }
 
 export interface NodalSummary {
@@ -131,6 +132,17 @@ export interface NodalNetwork {
   name: string; baseMVA: number; reference_zone: string;
   zones: NodalZone[]; generators: NodalGenerator[]; branches: NodalBranch[];
   loads: NodalBusLoad[]; demand_shares: Record<string, number>;
+}
+
+export interface TopologyNetworkResponse {
+  network: NodalNetwork;
+  scraped_at: string | null;
+}
+
+export interface TopologyScrapeResponse {
+  zones: number;
+  generators: number;
+  branches: number;
 }
 
 export type NodalMetrics = Record<string, number>;

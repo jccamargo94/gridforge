@@ -20,6 +20,7 @@ import { useState, type FormEvent } from "react";
 import {
   Calendar,
   Cpu,
+  Info,
   Layers,
   Network,
   Play,
@@ -32,6 +33,7 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
   const [solver, setSolver] = useState("cbc");
   const [scenarioId, setScenarioId] = useState("");
   const [network, setNetwork] = useState<NodalNetwork | null>(null);
+  const [recomputeDemandShares, setRecomputeDemandShares] = useState(false);
   const router = useRouter();
   const t = useT();
 
@@ -52,6 +54,7 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
       solver,
       scenario_id: scenarioId || null,
       nodal_network: level === "lmp" ? network : null,
+      recompute_demand_shares: level === "lmp" ? recomputeDemandShares : false,
     });
   }
 
@@ -173,6 +176,23 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
           {!network && (
             <p className="text-xs text-red-400">{t("createRun.nodalNetworkRequired")}</p>
           )}
+          <label
+            htmlFor="recompute_demand_shares"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            <input
+              type="checkbox"
+              id="recompute_demand_shares"
+              checked={recomputeDemandShares}
+              onChange={(e) => setRecomputeDemandShares(e.target.checked)}
+              className="size-3.5"
+            />
+            {t("createRun.recomputeDemandShares")}
+            <Info
+              className="size-3.5 text-muted-foreground"
+              title={t("createRun.recomputeDemandSharesTooltip")}
+            />
+          </label>
         </div>
       )}
 

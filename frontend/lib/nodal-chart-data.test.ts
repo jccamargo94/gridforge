@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateGenRevenueByZoneFuel,
   hourFromTimestamp, toBranchFlowSeries, toNodalDispatchSeries,
-  toPriceCurveData, zoneLmpAtHour,
+  toPriceCurveData, toAvgPriceData, toCongestionCurveData, zoneLmpAtHour,
 } from "./nodal-chart-data";
 
 describe("hourFromTimestamp", () => {
@@ -92,5 +92,32 @@ describe("aggregateGenRevenueByZoneFuel", () => {
 
   it("returns an empty list for no rows", () => {
     expect(aggregateGenRevenueByZoneFuel([])).toEqual([]);
+  });
+});
+
+describe("toAvgPriceData", () => {
+  const rows = [
+    { timestamp: "H00", bus: "norte", lmp: 20, lmp_avg: 60, lmp_congestion: -40 },
+    { timestamp: "H00", bus: "sur", lmp: 80, lmp_avg: 60, lmp_congestion: 20 },
+    { timestamp: "H01", bus: "norte", lmp: 21, lmp_avg: 61, lmp_congestion: -40 },
+  ];
+  it("builds 24 hourly points with one value per hour, deduped across zones", () => {
+    const data = toAvgPriceData(rows);
+    expect(data).toHaveLength(24);
+    expect(data[0]).toMatchObject({ hour: 0, lmp_avg: 60 });
+    expect(data[1]).toMatchObject({ hour: 1, lmp_avg: 61 });
+  });
+});
+
+describe("toCongestionCurveData", () => {
+  const rows = [
+    { timestamp: "H00", bus: "norte", lmp: 20, lmp_avg: 60, lmp_congestion: -40 },
+    { timestamp: "H00", bus: "sur", lmp: 80, lmp_avg: 60, lmp_congestion: 20 },
+  ];
+  it("builds 24 hourly points with one series per zone, valued by congestion", () => {
+    const { data, seriesKeys } = toCongestionCurveData(rows);
+    expect(data).toHaveLength(24);
+    expect(seriesKeys.sort()).toEqual(["norte", "sur"]);
+    expect(data[0]).toMatchObject({ hour: 0, norte: -40, sur: 20 });
   });
 });

@@ -21,7 +21,13 @@ def save_nodal_artifacts(
     storage = get_storage(out_dir)
 
     lmp_rows = [
-        {"timestamp": ts, "bus": bus, "lmp": sol.lmp[bus][t]}
+        {
+            "timestamp": ts,
+            "bus": bus,
+            "lmp": sol.lmp[bus][t],
+            "lmp_avg": sol.lmp_avg[t],
+            "lmp_congestion": sol.lmp_congestion[bus][t],
+        }
         for t, ts in enumerate(sol.timestamps)
         for bus in sol.buses
     ]

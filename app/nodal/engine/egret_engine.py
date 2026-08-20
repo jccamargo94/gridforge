@@ -4,6 +4,7 @@ from egret.models.dcopf import solve_dcopf
 from egret.models.unit_commitment import solve_unit_commitment
 
 from app.nodal.engine.base import NodalSolution
+from app.nodal.engine.pricing import congestion_component, demand_weighted_average_price
 from app.nodal.network.schemas import NodalNetwork
 from app.nodal.network.to_egret import enforce_commitment, model_data_for_hour, nodal_to_model_data
 
@@ -66,12 +67,18 @@ class EgretNodalEngine:
             for b in net.branches:
                 branch_flows[b.name].append(float(out.data["elements"]["branch"][b.name]["pf"]))
 
+        zone_names = [z.name for z in net.zones]
+        lmp_avg = demand_weighted_average_price(lmp, loads, zone_names, len(time_keys))
+        lmp_congestion = congestion_component(lmp, lmp_avg, zone_names, len(time_keys))
+
         total_cost = sum(sum(v) for v in gen_cost.values())
         return NodalSolution(
             timestamps=time_keys,
             buses=[z.name for z in net.zones],
             reference_zone=net.reference_zone,
             lmp=lmp,
+            lmp_avg=lmp_avg,
+            lmp_congestion=lmp_congestion,
             dispatch=dispatch,
             loads=loads,
             branch_flows=branch_flows,

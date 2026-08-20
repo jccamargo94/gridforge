@@ -49,17 +49,14 @@ export function buildGraphElements(network: NodalNetwork): {
   nodes: ZoneFlowNode[];
   edges: BranchFlowEdge[];
 } {
-  const layout = computeZoneLayout(
-    network.zones.map((z) => z.name),
-    network.branches.map((b) => ({ from: b.from_zone, to: b.to_zone })),
-  );
+  const layout = computeZoneLayout(network.zones.map((z) => z.name));
 
   const nodes: ZoneFlowNode[] = network.zones.map((zone) => {
     const generators = network.generators.filter((g) => g.zone === zone.name);
     return {
       id: zone.name,
       type: "zone",
-      position: layout[zone.name] ?? { x: 0, y: 0 },
+      position: layout.positions[zone.name] ?? { x: 0, y: 0 },
       data: {
         zoneName: zone.name,
         installedCapacityMw: generators.reduce((sum, g) => sum + g.p_max, 0),

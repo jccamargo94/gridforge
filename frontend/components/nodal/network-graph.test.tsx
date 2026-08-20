@@ -46,12 +46,9 @@ describe("buildGraphElements", () => {
     const { nodes } = buildGraphElements(fixture);
 
     expect(nodes).toHaveLength(2);
-    const layout = computeZoneLayout(
-      fixture.zones.map((z) => z.name),
-      fixture.branches.map((b) => ({ from: b.from_zone, to: b.to_zone })),
-    );
+    const layout = computeZoneLayout(fixture.zones.map((z) => z.name));
     for (const node of nodes) {
-      expect(node.position).toEqual(layout[node.id]);
+      expect(node.position).toEqual(layout.positions[node.id]);
       expect(Number.isFinite(node.position.x)).toBe(true);
       expect(Number.isFinite(node.position.y)).toBe(true);
     }

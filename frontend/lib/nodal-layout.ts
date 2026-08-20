@@ -1,77 +1,46 @@
-const CANVAS_WIDTH = 600;
-const CANVAS_HEIGHT = 400;
+const MIN_WIDTH = 600;
+const MIN_HEIGHT = 400;
+const PADDING = 40;
+const GAP = 16;
 
 interface Point { x: number; y: number; }
 
-export interface ZoneEdge { from: string; to: string; }
+export interface ZoneLayout {
+  positions: Record<string, Point>;
+  width: number;
+  height: number;
+  nodeRadius: number;
+}
 
-export function computeZoneLayout(
-  zones: string[],
-  branches: ZoneEdge[],
-): Record<string, Point> {
+// A ring layout: nodes evenly spaced around a circle whose radius grows with
+// the zone count, so adjacent node circles never overlap regardless of n.
+// (The previous force-directed simulation, which also took branches as
+// input, was only ever exercised against the 3-zone example network; a real
+// ~18-zone mesh collapsed it into an unreadable cluster -- see the "mapa
+// zonal roto" finding. Branch topology doesn't factor into node placement
+// here, so it's not a parameter.)
+export function computeZoneLayout(zones: string[]): ZoneLayout {
   const n = zones.length;
-  if (n === 0) return {};
-  const cx = CANVAS_WIDTH / 2;
-  const cy = CANVAS_HEIGHT / 2;
-  const radius = Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) * 0.38;
-  const pos: Record<string, Point> = {};
-  zones.forEach((zone, i) => {
-    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-    pos[zone] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
-  });
-  if (n === 1) return pos;
-
-  const k = Math.sqrt((CANVAS_WIDTH * CANVAS_HEIGHT) / n) * 0.35;
-  const iterations = 200;
-  const known = new Set(zones);
-
-  for (let iter = 0; iter < iterations; iter++) {
-    const temp = 1 - iter / iterations;
-    const disp: Record<string, Point> = {};
-    zones.forEach((zone) => { disp[zone] = { x: 0, y: 0 }; });
-
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const a = zones[i];
-        const b = zones[j];
-        let dx = pos[a].x - pos[b].x;
-        let dy = pos[a].y - pos[b].y;
-        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 0.01);
-        const force = (k * k) / dist;
-        dx = (dx / dist) * force;
-        dy = (dy / dist) * force;
-        disp[a].x += dx;
-        disp[a].y += dy;
-        disp[b].x -= dx;
-        disp[b].y -= dy;
-      }
-    }
-
-    for (const edge of branches) {
-      if (!known.has(edge.from) || !known.has(edge.to)) continue;
-      let dx = pos[edge.from].x - pos[edge.to].x;
-      let dy = pos[edge.from].y - pos[edge.to].y;
-      const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 0.01);
-      const force = (dist * dist) / k;
-      dx = (dx / dist) * force;
-      dy = (dy / dist) * force;
-      disp[edge.from].x -= dx;
-      disp[edge.from].y -= dy;
-      disp[edge.to].x += dx;
-      disp[edge.to].y += dy;
-    }
-
-    zones.forEach((zone) => {
-      const d = Math.sqrt(disp[zone].x * disp[zone].x + disp[zone].y * disp[zone].y);
-      const step = d > 0 ? Math.min(d, temp) / d : 0;
-      pos[zone].x += disp[zone].x * step;
-      pos[zone].y += disp[zone].y * step;
-      pos[zone].x = Math.min(CANVAS_WIDTH - 30, Math.max(30, pos[zone].x));
-      pos[zone].y = Math.min(CANVAS_HEIGHT - 30, Math.max(30, pos[zone].y));
-    });
+  if (n === 0) {
+    return { positions: {}, width: MIN_WIDTH, height: MIN_HEIGHT, nodeRadius: 30 };
   }
 
-  return pos;
+  const nodeRadius = Math.max(14, Math.min(30, Math.round(240 / n)));
+  const minSeparation = 2 * nodeRadius + GAP;
+  const circleRadius = n > 1 ? minSeparation / (2 * Math.sin(Math.PI / n)) : 0;
+  const side = 2 * (circleRadius + nodeRadius) + PADDING;
+  const width = Math.max(MIN_WIDTH, side);
+  const height = Math.max(MIN_HEIGHT, side);
+  const cx = width / 2;
+  const cy = height / 2;
+
+  const positions: Record<string, Point> = {};
+  zones.forEach((zone, i) => {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+    positions[zone] = { x: cx + circleRadius * Math.cos(angle), y: cy + circleRadius * Math.sin(angle) };
+  });
+
+  return { positions, width, height, nodeRadius };
 }
 
 const BLUE: [number, number, number] = [37, 99, 235];

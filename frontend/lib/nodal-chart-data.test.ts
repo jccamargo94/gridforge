@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aggregateGenRevenueByZoneFuel,
   hourFromTimestamp, toBranchFlowSeries, toNodalDispatchSeries,
   toPriceCurveData, zoneLmpAtHour,
 } from "./nodal-chart-data";
@@ -73,5 +74,23 @@ describe("zoneLmpAtHour", () => {
   it("returns the lmp for a zone and hour", () => {
     expect(zoneLmpAtHour(rows, "norte", 0)).toBe(20);
     expect(zoneLmpAtHour(rows, "norte", 5)).toBeNull();
+  });
+});
+
+describe("aggregateGenRevenueByZoneFuel", () => {
+  it("sums revenue across generators sharing the same (zone, fuel)", () => {
+    const rows = [
+      { zone: "norte", fuel: "hydro", revenue_a: 100, revenue_b: 110, delta: 10 },
+      { zone: "norte", fuel: "hydro", revenue_a: 50, revenue_b: 45, delta: -5 },
+      { zone: "sur", fuel: "thermal", revenue_a: 200, revenue_b: 200, delta: 0 },
+    ];
+    const result = aggregateGenRevenueByZoneFuel(rows);
+    expect(result).toHaveLength(2);
+    const norteHydro = result.find((r) => r.zone === "norte" && r.fuel === "hydro");
+    expect(norteHydro).toMatchObject({ revenue_a: 150, revenue_b: 155, delta: 5 });
+  });
+
+  it("returns an empty list for no rows", () => {
+    expect(aggregateGenRevenueByZoneFuel([])).toEqual([]);
   });
 });

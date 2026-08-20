@@ -24,6 +24,7 @@ dependencies = [
     "alembic==1.19.0",
     "pyjwt[crypto]==2.13.0",
     "gridx-egret==0.6.2",
+    "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +39,6 @@ notebooks = [
 [dependency-groups]
 dev = [
     "pytest",
-    "httpx==0.28.1",
     "ruff==0.11.13",
     "pre-commit==4.6.1",
     "ty==0.0.66",
@@ -71,3 +71,8 @@ select = ["E", "F", "I"]
 # this one never got an `__all__`. Adding one is a package-API decision, not a
 # tooling change, so it's left as a suppressed finding rather than guessed at.
 "app/model/constraints/bess/__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+markers = [
+    "live: test que llama a servicios externos (API PARATEC / XM); excluido del default",
+]

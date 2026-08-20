@@ -1,0 +1,1 @@
+"""PARATEC → NodalNetwork topology scraper."""

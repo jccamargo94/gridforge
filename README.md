@@ -439,6 +439,13 @@ Mismo comando via Docker (ver seccion 6):
 docker compose --project-directory . --env-file .env -f docker/docker-compose.yml run --rm cli run 2024-04-18 -t preideal
 ```
 
+### Topología PARATEC → red nodal
+
+`uv run python -m app scrape-topology --date 2024-04-18` descarga los parámetros
+técnicos del sistema (subestaciones, líneas, catálogo de generación) desde PARATEC
+y la demanda por subárea desde XM, y escribe un `NodalNetwork` JSON consumible por
+`run -t lmp --nodal-network <archivo>`.
+
 ### Backend API, worker y migraciones (Fase 3)
 
 Desde Fase 3 el repo tambien incluye un backend HTTP (`services/api/`) y un

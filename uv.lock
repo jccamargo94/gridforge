@@ -950,6 +950,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "gridx-egret" },
     { name = "highspy" },
+    { name = "httpx" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -980,7 +981,6 @@ notebooks = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
@@ -995,6 +995,7 @@ requires-dist = [
     { name = "gridx-egret", specifier = "==0.6.2" },
     { name = "highspy", specifier = "==1.7.2" },
     { name = "holidays", marker = "extra == 'notebooks'" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "jupyterlab", marker = "extra == 'notebooks'", specifier = "==4.2.4" },
     { name = "matplotlib", marker = "extra == 'notebooks'", specifier = "==3.9.1" },
     { name = "numpy", specifier = "==1.26.4" },
@@ -1020,7 +1021,6 @@ provides-extras = ["notebooks"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = "==0.28.1" },
     { name = "pre-commit", specifier = "==4.6.1" },
     { name = "pytest" },
     { name = "ruff", specifier = "==0.11.13" },

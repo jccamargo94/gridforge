@@ -1,12 +1,14 @@
 from app.nodal.network.schemas import Branch, BusLoad, Generator, NodalNetwork, Zone
 
 
-def make_three_zone_network(*, congested: bool = False) -> NodalNetwork:
+def make_three_zone_network(
+    *, congested: bool = False, reference_zone: str = "norte"
+) -> NodalNetwork:
     rating = 120.0 if congested else 400.0
     return NodalNetwork(
         name="three_zone",
         baseMVA=100.0,
-        reference_zone="norte",
+        reference_zone=reference_zone,
         zones=[Zone(name="norte"), Zone(name="centro"), Zone(name="sur")],
         generators=[
             Generator(

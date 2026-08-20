@@ -446,6 +446,18 @@ técnicos del sistema (subestaciones, líneas, catálogo de generación) desde P
 y la demanda por subárea desde XM, y escribe un `NodalNetwork` JSON consumible por
 `run -t lmp --nodal-network <archivo>`.
 
+`--scope` controla la granularidad de zona (default `subarea`):
+
+- `subarea` (default): una zona por subárea operativa (21 zonas domésticas). Las
+  ramas inter-subárea salen de `TransmissionMap/getLines`; las líneas dentro de
+  una misma subárea se fusionan y quedan resumidas (no como zonas del grafo) en
+  `topology/network_summary.json`.
+- `node`: una zona por subestación PARATEC (500+ zonas) — el comportamiento
+  original, útil para pruebas de carga/desempeño del motor con la topología
+  completa.
+- `area`: no implementado aún — PARATEC no tiene datos de línea a nivel de las
+  8 áreas operativas.
+
 ### Backend API, worker y migraciones (Fase 3)
 
 Desde Fase 3 el repo tambien incluye un backend HTTP (`services/api/`) y un

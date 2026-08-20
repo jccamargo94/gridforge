@@ -7,7 +7,7 @@ from app.nodal.settlement.rent import congestion_rent
 
 def settle_status_quo(sol: NodalSolution) -> Settlement:
     n = len(sol.timestamps)
-    energy_price = [sol.lmp[sol.reference_zone][t] for t in range(n)]
+    energy_price = list(sol.lmp_avg)
     congestion_rents = [congestion_rent(sol, t) for t in range(n)]
     total_load = [sum(sol.loads[b][t] for b in sol.buses) for t in range(n)]
 

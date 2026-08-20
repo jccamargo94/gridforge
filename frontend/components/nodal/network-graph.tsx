@@ -222,7 +222,7 @@ export function NetworkGraph({ network }: { network: NodalNetwork }) {
   const visibleEdges = useMemo(
     () =>
       edges.map((edge) =>
-        edge.id === activeEdgeId
+        edge.id === activeEdgeId && edge.data
           ? {
               ...edge,
               label: `${edge.data.reactance} / ${edge.data.rating} MW`,
@@ -249,7 +249,7 @@ export function NetworkGraph({ network }: { network: NodalNetwork }) {
           onEdgeMouseLeave={() => setActiveEdgeId(null)}
           onEdgeClick={(_, edge) => setActiveEdgeId(edge.id)}
           proOptions={{ hideAttribution: true }}
-          ariaLabel={`${t("nodalNetwork.graph.dialogTitle")} ${network.name}`}
+          aria-label={`${t("nodalNetwork.graph.dialogTitle")} ${network.name}`}
         >
           <Background />
           <Controls showInteractive={false} />

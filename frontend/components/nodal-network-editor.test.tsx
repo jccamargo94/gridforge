@@ -22,6 +22,17 @@ function renderEditor() {
 }
 
 describe("NodalNetworkEditor", () => {
+  it("enables the graph dialog only once the network is valid", () => {
+    renderEditor();
+
+    const viewGraph = screen.getByRole("button", { name: /ver grafo/i });
+    expect(viewGraph).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /cargar red de ejemplo/i }));
+
+    expect(screen.getByRole("button", { name: /ver grafo/i })).toBeEnabled();
+  });
+
   it("loads the example network and calls onChange with a valid network", () => {
     const { onChange } = renderEditor();
 

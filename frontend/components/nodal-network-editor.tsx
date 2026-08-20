@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { NetworkGraphDialog } from "@/components/nodal/network-graph-dialog";
 import { getTopologyNetwork, scrapeTopology } from "@/lib/api-client";
 import { NODAL_EXAMPLE_NETWORK } from "@/lib/nodal-example";
 import type { NodalNetwork } from "@/lib/types";
@@ -208,6 +209,7 @@ export function NodalNetworkEditor({
         >
           {colombiaStatus === "scraping" ? t("nodalNetwork.scraping") : t("nodalNetwork.scrapeColombia")}
         </Button>
+        <NetworkGraphDialog network={result.network} />
         <p
           className={
             valid

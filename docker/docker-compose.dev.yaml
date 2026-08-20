@@ -11,6 +11,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.api
     entrypoint: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DATABASE_URL=${DATABASE_URL}
     volumes:
@@ -28,6 +29,7 @@ services:
     # append args after it (uvicorn invoked twice), so override the entrypoint
     # itself to add --reload.
     entrypoint: ["uv", "run", "--no-sync", "uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - SUPABASE_JWKS_URL=${SUPABASE_JWKS_URL}
@@ -47,6 +49,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DATABASE_URL=${DATABASE_URL}
     volumes:
@@ -59,6 +62,9 @@ services:
 
   frontend:
     # pnpm@11.8.0 (frontend/package.json packageManager) requires Node >=22.13
+    # No `user:` override here: corepack enable needs root to symlink into
+    # /usr/local/bin, and this service doesn't write into ./data anyway --
+    # not the surface the root-owned-files problem comes from.
     image: node:22-alpine
     working_dir: /app
     command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm dev"

@@ -16,6 +16,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.cli
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
       - ./data:/app/data
     command: ["run"]
@@ -27,6 +28,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - SUPABASE_JWKS_URL=${SUPABASE_JWKS_URL}
@@ -44,6 +46,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     environment:
       - DATABASE_URL=${DATABASE_URL}
     volumes:

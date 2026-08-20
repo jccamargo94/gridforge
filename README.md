@@ -302,6 +302,15 @@ Para correr contra datos reales, montar `data/` como volumen (ver
 docker compose --project-directory . --env-file .env -f docker/docker-compose.yml run --rm cli run 2024-04-18 -t preideal
 ```
 
+Los servicios que montan `./data` (`cli`, `api`, `worker`) corren como
+`DOCKER_UID:DOCKER_GID` en vez de root, para que los archivos que escriben
+en el host (`data/results/...`, `data/topology/...`) queden con tu usuario
+en vez de root-owned. Exportalas antes de levantar el stack:
+
+```bash
+export DOCKER_UID=$(id -u) DOCKER_GID=$(id -g)
+```
+
 ---
 
 ## 7. Datos requeridos

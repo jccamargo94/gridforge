@@ -40,7 +40,8 @@ def test_artifacts_written(tmp_path):
     with open(tmp_path.joinpath(paths["summary.json"].split("/")[-1])) as f:
         summary = json.load(f)
     assert math.isclose(summary["metrics"]["congestion_rent_total"], 24 * 7200, abs_tol=1e-3)
-    assert summary["totals"]["total_load_payment_b"] > summary["totals"]["total_load_payment_a"]
+    assert math.isclose(summary["totals"]["total_load_payment_a"], 604800.0, abs_tol=1e-4)
+    assert math.isclose(summary["totals"]["total_load_payment_b"], 432000.0, abs_tol=1e-4)
 
 
 def test_lmp_csv_includes_avg_and_congestion_columns(tmp_path):

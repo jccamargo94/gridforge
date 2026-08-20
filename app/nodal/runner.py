@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from datetime import date
 
-from app.data.loaders import load_demanda
+from app.data.heuristic.biddings import _match_resource_name, ensure_ofertas_estimado
+from app.data.loaders import load_demanda, load_dispo, load_ofertas
 from app.nodal.engine.egret_engine import EgretNodalEngine
-from app.nodal.network.schemas import BusLoad, NodalNetwork
+from app.nodal.network.schemas import BusLoad, Generator, NodalNetwork
 from app.nodal.reporting import save_nodal_artifacts
 from app.nodal.settlement.compare import compare_settlements
 from app.nodal.settlement.lmp import settle_lmp
@@ -41,12 +42,47 @@ def build_zonal_loads(net: NodalNetwork, dispatch_date: date, data_dir: str) -> 
     ]
 
 
+def build_generator_costs(net: NodalNetwork, dispatch_date: date, data_dir: str) -> list[Generator]:
+    # Real, per-day market price (ofertas) overrides the static topology-scrape
+    # fallback (parse.py's _cost_for) -- mirrors build_zonal_loads attaching
+    # real demand at run time instead of scrape time. demand_shares is only
+    # ever set by the real topology builders (never by synthetic/example
+    # networks), so it doubles as "this network has matching market data".
+    if not net.demand_shares:
+        return list(net.generators)
+    try:
+        oferta_full = load_ofertas(data_dir, dispatch_date.year)
+        day = oferta_full[oferta_full["Date"].dt.date == dispatch_date]
+        if day.empty:
+            dispo = load_dispo(data_dir, dispatch_date.year)
+            day_dispo = dispo[dispo["datetime"].dt.date == dispatch_date]
+            day = ensure_ofertas_estimado(dispatch_date, data_dir, day_dispo, oferta_full)
+    except (FileNotFoundError, ValueError):
+        return list(net.generators)
+    if day.empty:
+        return list(net.generators)
+
+    price_by_resource = day.groupby("resource_name")["Value"].last().to_dict()
+    resource_names = list(price_by_resource.keys())
+    updated = []
+    for g in net.generators:
+        matched = _match_resource_name(g.name, resource_names)
+        cost = price_by_resource[matched] if matched is not None else g.marginal_cost
+        updated.append(g.model_copy(update={"marginal_cost": cost}))
+    return updated
+
+
 def run_nodal(
     case: DispatchCase, *, out: str = "data/results", data_dir: str = "data"
 ) -> RunResult:
     try:
         net = load_network(case.nodal_network)
-        net = net.model_copy(update={"loads": build_zonal_loads(net, case.dispatch_date, data_dir)})
+        net = net.model_copy(
+            update={
+                "loads": build_zonal_loads(net, case.dispatch_date, data_dir),
+                "generators": build_generator_costs(net, case.dispatch_date, data_dir),
+            }
+        )
         sol = EgretNodalEngine().solve(net, solver=case.solver)
         a = settle_status_quo(sol)
         b = settle_lmp(sol)

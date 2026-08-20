@@ -107,12 +107,13 @@ def parse_generators(
                     cap = float(element.get("netEffectiveCapacity") or 0.0)
                     if cap <= 0:
                         continue
+                    fuel = _fuel_for(plant_group)
                     gens.append(
                         {
                             "name": element["elementName"],
                             "capacity": cap,
-                            "fuel": _fuel_for(element, gtype),
-                            "marginal_cost": _cost_for(element, gtype),
+                            "fuel": fuel,
+                            "marginal_cost": _cost_for(fuel),
                             "subarea": element.get("subArea") or "",
                             "latitude": None,
                             "longitude": None,
@@ -121,8 +122,12 @@ def parse_generators(
     return gens
 
 
-def _fuel_for(element: dict, gtype: dict) -> str:
-    name = (gtype.get("name") or "").lower()
+def _fuel_for(plant_group: dict) -> str:
+    # Fuel taxonomy ("Planta Hidráulica"/"Planta Solar"/"Planta térmica")
+    # lives on the plant_group, one level above generatorTypes.
+    # generatorTypes.name is a dispatch/ownership category
+    # ("Generador"/"Autogenerador"/"Cogenerador"), never a fuel string.
+    name = (plant_group.get("name") or "").lower()
     if "hidráulica" in name or "hidraulica" in name:
         return "hydro"
     if "solar" in name:
@@ -132,13 +137,14 @@ def _fuel_for(element: dict, gtype: dict) -> str:
     return "thermal"
 
 
-def _cost_for(element: dict, gtype: dict) -> float:
-    # Marginal cost: thermal uses heat-rate × fuel price (documented fallback);
-    # hydro/solar/wind use 0.0 (zero fuel cost).
-    fuel = _fuel_for(element, gtype)
+def _cost_for(fuel: str) -> float:
+    # Marginal cost placeholder for the static topology scrape only -- the
+    # real, date-varying market price comes from ofertas/ofertas_estimado,
+    # attached at run time by app/nodal/runner.py::build_generator_costs.
+    # ponytail: this 80.0 fallback only fires for a generator that never
+    # appears in ofertas for any date; raise it if that shows up in practice.
     if fuel != "thermal":
         return 0.0
-    # Documented fallback table (USD/MWh); refined per-plant via getAllFuel heatRate.
     return 80.0
 
 

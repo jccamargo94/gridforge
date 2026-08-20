@@ -86,24 +86,16 @@ export default function NodalDashboardPage() {
   }
 
   const { metrics } = nodal;
-  const priceAvgKeys = Object.keys(metrics).filter((key) => key.startsWith("price_avg_"));
-  const priceVolKeys = Object.keys(metrics).filter((key) => key.startsWith("price_vol_"));
-
+  // Per-zone price_avg_*/price_vol_* keys are deliberately NOT tiled here --
+  // with 18 real zones that was 36 near-duplicate cards to scroll past
+  // before reaching the map or any chart. That per-zone signal already has
+  // a proper home: the zonal map (color-coded) and the price-curves chart
+  // (per-zone lines) below.
   const metricCards: MetricCardProps[] = [
     { label: t("nodal.totalCost"), value: formatNumber(metrics.total_cost), icon: Wallet },
     { label: t("nodal.loadPaymentDelta"), value: formatNumber(metrics.load_payment_delta), icon: ArrowDownUp },
     { label: t("nodal.genRevenueDelta"), value: formatNumber(metrics.gen_revenue_delta), icon: TrendingUp },
     { label: t("nodal.congestionRent"), value: formatNumber(metrics.congestion_rent_total), icon: Coins },
-    ...priceAvgKeys.map((key) => ({
-      label: `${t("nodal.priceAvg")} ${key.replace("price_avg_", "")}`,
-      value: formatNumber(metrics[key]),
-      icon: Wallet,
-    })),
-    ...priceVolKeys.map((key) => ({
-      label: `${t("nodal.priceVol")} ${key.replace("price_vol_", "")}`,
-      value: formatNumber(metrics[key]),
-      icon: TrendingUp,
-    })),
   ];
 
   return (

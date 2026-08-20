@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import logging
 import time
 import traceback
 
@@ -59,9 +60,22 @@ def process_once(
         # solve, instead of pinning a pooler connection with an open transaction.
         session.commit()
 
+        # Egret/Pyomo emit their own warnings (e.g. the cbc dual-suffix
+        # warning) via `logging`, not `print()` -- a logging.StreamHandler
+        # bound to stderr at import time doesn't care that sys.stderr gets
+        # swapped below, so redirect_stdout/redirect_stderr alone would miss
+        # them and leave run.log empty even though the solver warned.
         log_buffer = io.StringIO()
-        with contextlib.redirect_stdout(log_buffer), contextlib.redirect_stderr(log_buffer):
-            result = run_case(case, evaluate=True, out=out_dir, data_dir=data_dir, session=session)
+        log_handler = logging.StreamHandler(log_buffer)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(log_handler)
+        try:
+            with contextlib.redirect_stdout(log_buffer), contextlib.redirect_stderr(log_buffer):
+                result = run_case(
+                    case, evaluate=True, out=out_dir, data_dir=data_dir, session=session
+                )
+        finally:
+            root_logger.removeHandler(log_handler)
 
         with contextlib.suppress(OSError):
             with get_storage(".").open(log_path, "w") as f:

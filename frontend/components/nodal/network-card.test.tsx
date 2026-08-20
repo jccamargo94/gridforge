@@ -28,6 +28,26 @@ describe("NetworkCard", () => {
     expect(screen.getByText("centro")).toBeInTheDocument();
     expect(screen.getByText("G_N")).toBeInTheDocument();
     expect(screen.getByText("NC")).toBeInTheDocument();
-    expect(screen.getByText(/hydro/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/hydro/i).length).toBeGreaterThan(0);
+  });
+
+  it("summarizes the fuel mix instead of only listing it per-row", () => {
+    render(<I18nProvider><NetworkCard network={NETWORK} /></I18nProvider>);
+    expect(screen.getByText("hydro: 1")).toBeInTheDocument();
+  });
+
+  it("paginates a large generator list instead of dumping every row", () => {
+    const manyGenerators = Array.from({ length: 60 }, (_, i) => ({
+      name: `GEN_${i}`, zone: "norte", p_min: 0, p_max: 10, marginal_cost: 50,
+      no_load_cost: 0, fuel: "thermal", min_up_time: 1, min_down_time: 1,
+      initial_status: 1, ramp_rate: null,
+    }));
+    render(
+      <I18nProvider>
+        <NetworkCard network={{ ...NETWORK, generators: manyGenerators }} />
+      </I18nProvider>,
+    );
+    expect(screen.getByText("GEN_0")).toBeInTheDocument();
+    expect(screen.queryByText("GEN_59")).not.toBeInTheDocument();
   });
 });

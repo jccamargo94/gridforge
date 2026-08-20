@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from pathlib import Path
 
@@ -204,6 +205,35 @@ def test_process_once_nodal_without_network_uses_example(tmp_path, monkeypatch):
     assert scaled_by_zone["norte"] == pytest.approx([140.0] * 24)
     assert scaled_by_zone["centro"] == pytest.approx([122.5] * 24)
     assert scaled_by_zone["sur"] == pytest.approx([87.5] * 24)
+
+
+def test_process_once_captures_messages_emitted_via_logging_not_just_print(tmp_path, monkeypatch):
+    # Egret/Pyomo warn via `logging`, not print() -- redirect_stdout/stderr alone miss those.
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+
+    case = DispatchCase(dispatch_date=FECHA, level=DispatchLevel.preideal, solver="cbc")
+
+    def _fake_run_case(*a, **kw):
+        logging.getLogger("egret.fake").warning("dual suffix warning via logging, not print")
+        return RunResult(case=case, ok=True)
+
+    monkeypatch.setattr("services.worker.main.run_case", _fake_run_case)
+
+    processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
+    assert processed is True
+
+    updated = queries.get_run(session, run.id)
+    log_file = Path(updated.log_path)
+    assert "dual suffix warning via logging, not print" in log_file.read_text()
 
 
 def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, monkeypatch):

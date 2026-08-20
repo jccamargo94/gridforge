@@ -26,6 +26,18 @@ describe("formatNumber", () => {
     expect(formatNumber(undefined)).toBe("\u2014");
     expect(formatNumber(Number.NaN)).toBe("\u2014");
   });
+
+  it("shows 0, not -0, for solver floating-point noise that rounds to zero", () => {
+    // e.g. compare_settlements deltas that are analytically zero but land at
+    // ~1e-10 due to LP solver tolerance.
+    expect(formatNumber(-2.3283064365386963e-10)).toBe("0");
+    expect(formatNumber(-0.00004, 2)).toBe("0.00");
+    expect(formatNumber(-0)).toBe("0");
+  });
+
+  it("still shows real negative values that round to a nonzero value", () => {
+    expect(formatNumber(-0.006, 2)).toBe("-0.01");
+  });
 });
 
 describe("formatHourLabel", () => {

@@ -77,8 +77,9 @@ describe("Run detail page", () => {
 
   it("links to the nodal dashboard when the run has nodal data", async () => {
     render(<Page />, { wrapper });
-    const link = await screen.findByRole("link", { name: /Analisis nodal/i });
-    expect(link).toHaveAttribute("href", "/runs/run-1/nodal");
+    const links = await screen.findAllByRole("link", { name: /Analisis nodal/i });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute("href", "/runs/run-1/nodal");
   });
 
   it("does not link to the nodal dashboard when the run has no nodal data", async () => {
@@ -86,5 +87,21 @@ describe("Run detail page", () => {
     render(<Page />, { wrapper });
     await waitFor(() => expect(screen.getByText("run-1")).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: /Analisis nodal/i })).toBeNull();
+  });
+
+  it("shows a nodal CTA instead of the misleading empty legacy dispatch/price/download cards", async () => {
+    render(<Page />, { wrapper });
+    await waitFor(() => expect(screen.getByText("run-1")).toBeInTheDocument());
+    expect(screen.getByText(/corrida nodal/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Despacho por generador/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Descargar resultados$/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the legacy dispatch/price/download cards for a non-nodal run", async () => {
+    vi.mocked(getRun).mockResolvedValue({ ...NODAL_RUN, nodal: null });
+    render(<Page />, { wrapper });
+    await waitFor(() => expect(screen.getByText(/Despacho por generador/i)).toBeInTheDocument());
+    expect(screen.getByText(/^Descargar resultados$/i)).toBeInTheDocument();
+    expect(screen.queryByText(/corrida nodal/i)).not.toBeInTheDocument();
   });
 });

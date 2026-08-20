@@ -112,9 +112,11 @@ describe("Nodal dashboard page", () => {
 
   it("changes the selected hour via the selector", async () => {
     render(<Page />, { wrapper });
-    await waitFor(() => expect(screen.getByRole("combobox")).toBeInTheDocument());
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "3" } });
-    expect(screen.getByRole("combobox")).toHaveValue("3");
+    // Disambiguated from the DataTable rows-per-page selects (Network/
+    // Differential tables each render their own <select>).
+    await waitFor(() => expect(screen.getByLabelText("Hora")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Hora"), { target: { value: "3" } });
+    expect(screen.getByLabelText("Hora")).toHaveValue("3");
   });
 
   it("renders the run level as a badge", async () => {

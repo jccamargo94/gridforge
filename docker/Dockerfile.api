@@ -7,6 +7,12 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --frozen
 
+# Set only after the build-time sync above (which stays root-owned, fine --
+# nothing at runtime touches it): /root/.cache isn't writable by the
+# arbitrary non-root UID docker-compose runs this image as (see
+# docker-compose.yml's `user:` override), but /tmp is always world-writable.
+ENV UV_CACHE_DIR=/tmp/uv-cache
+
 COPY app ./app
 COPY services/api ./services/api
 COPY alembic ./alembic

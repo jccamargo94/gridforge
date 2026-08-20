@@ -60,13 +60,18 @@ def test_parse_demand_ddem_skips_excluded_rows():
 
 
 def _capacity_data_report():
+    # Real PARATEC shape: the fuel taxonomy ("Planta Hidráulica"/"Planta
+    # Solar"/"Planta térmica") lives on the plant_group, one level above
+    # generatorTypes. generatorTypes.name is a dispatch/ownership category
+    # ("Generador"/"Autogenerador"/"Cogenerador"), never a fuel string.
     return [
         {
+            "name": "Planta Hidráulica",
             "dispatchedType": [
                 {
                     "generatorTypes": [
                         {
-                            "name": "Hidráulica",
+                            "name": "Generador",
                             "elements": [
                                 {
                                     "elementName": "GUATAPE",
@@ -76,8 +81,26 @@ def _capacity_data_report():
                         }
                     ],
                 }
-            ]
-        }
+            ],
+        },
+        {
+            "name": "Planta térmica",
+            "dispatchedType": [
+                {
+                    "generatorTypes": [
+                        {
+                            "name": "Generador",
+                            "elements": [
+                                {
+                                    "elementName": "TERMOZIPA",
+                                    "netEffectiveCapacity": "500",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
     ]
 
 
@@ -95,9 +118,12 @@ def test_parse_demand_pron_reads_en_rows_and_skips_pot():
 def test_parse_generators_flat_data_report():
     payload = {"dataReport": _capacity_data_report()}
     gens = parse.parse_generators(payload, {}, {}, {}, {})
-    assert len(gens) == 1
-    assert gens[0]["name"] == "GUATAPE"
-    assert gens[0]["fuel"] == "hydro"
+    assert len(gens) == 2
+    by_name = {g["name"]: g for g in gens}
+    assert by_name["GUATAPE"]["fuel"] == "hydro"
+    assert by_name["GUATAPE"]["marginal_cost"] == 0.0
+    assert by_name["TERMOZIPA"]["fuel"] == "thermal"
+    assert by_name["TERMOZIPA"]["marginal_cost"] == 80.0
 
 
 def test_parse_generators_nested_data_report():
@@ -106,9 +132,9 @@ def test_parse_generators_nested_data_report():
         "data": {"dataReport": _capacity_data_report()},
     }
     gens = parse.parse_generators(payload, {}, {}, {}, {})
-    assert len(gens) == 1
-    assert gens[0]["name"] == "GUATAPE"
-    assert gens[0]["fuel"] == "hydro"
+    by_name = {g["name"]: g for g in gens}
+    assert by_name["GUATAPE"]["fuel"] == "hydro"
+    assert by_name["TERMOZIPA"]["fuel"] == "thermal"
 
 
 def test_parse_lines_includes_own_subarea():

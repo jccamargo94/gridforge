@@ -92,3 +92,17 @@ def test_load_reference_price_ideal_uses_bolsa_when_available(tmp_path):
     ideal = load_reference_price(date(2024, 4, 18), level="ideal", data_dir=str(tmp_path))
     # The bolsa price (x1e3) wins over iMAR MPO when both exist.
     assert ideal[0] == 1000.0
+
+
+def test_load_reference_price_lmp_uses_bolsa_like_ideal(tmp_path):
+    (tmp_path / "precio_bolsa").mkdir()
+    rows = [f"2024-04-18 {h:02d}:00:00,{h + 1}" for h in range(24)]
+    (tmp_path / "precio_bolsa" / "precio_bolsa_2024.csv").write_text(
+        "datetime,precio_bolsa\n" + "\n".join(rows) + "\n"
+    )
+    (tmp_path / "2024-04-18").mkdir()
+    mpo = ",".join(str(float(i)) for i in range(24))
+    (tmp_path / "2024-04-18" / "iMAR0418.txt").write_text('"MPO",' + mpo + "\n")
+
+    lmp = load_reference_price(date(2024, 4, 18), level="lmp", data_dir=str(tmp_path))
+    assert lmp[0] == 1000.0

@@ -1,0 +1,8 @@
+{"data": [
+  {"type": "Feature",
+   "properties": {"nameLine": "A1 - B1 1", "sub1": "A1", "sub2": "B1", "subArea1": 0, "subArea2": 1},
+   "geometry": {"type": "LineString", "coordinates": [[-76.5, 3.4], [-74.1, 4.6]]}},
+  {"type": "Feature",
+   "properties": {"nameLine": "A1 - A2 1", "sub1": "A1", "sub2": "A2", "subArea1": 0, "subArea2": 0},
+   "geometry": {"type": "LineString", "coordinates": [[-76.5, 3.4], [-76.5, 3.5]]}}
+]}

@@ -1,0 +1,8 @@
+{"dataReport": [{"name": "Planta Hidraulica", "dispatchedType": [
+  {"name": "Despachada", "generatorTypes": [
+    {"name": "Hidraulica", "elements": [
+      {"elementName": "G1", "netEffectiveCapacity": 50.0,
+       "subArea": "SubArea Valle", "latitude": 3.41, "longitude": -76.49}
+    ]}
+  ]}
+]}]}

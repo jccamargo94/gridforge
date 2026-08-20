@@ -32,6 +32,7 @@ XM_DEMAND_BASE = "https://api-portalxm.xm.com.co/administracion-archivos/fichero
 ENDPOINTS: dict[str, str] = {
     "substations": f"{PARATEC_BASE}/reportetransmision/api/Substation/SubstationInfo",
     "lines": f"{PARATEC_BASE}/reportetransmision/api/Line/getAll",
+    "lines_map": f"{PARATEC_BASE}/mapas/api/TransmissionMap/getLines",
     "capacity": (
         f"{PARATEC_BASE}/reportegeneracion/api/NetEffectiveCapacities/getNetEffectiveCapacity"
     ),

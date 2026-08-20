@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 
+from app.data.topology.units import reactance_pu
 from app.nodal.network.schemas import (
     Branch,
     Generator,
@@ -20,13 +21,6 @@ def _haversine_km(lat1, lon1, lat2, lon2) -> float:
     dl = math.radians(lon2 - lon1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(a))
-
-
-def _reactance_pu(ohm: float, kv: float, base_mva: float = 100.0) -> float:
-    """Convert Ω (total line reactance) to per-unit on baseMVA at the line's kV."""
-    if kv <= 0:
-        return 0.0
-    return ohm * base_mva / (kv * kv)
 
 
 def _nearest_zone(lat, lon, subs, subarea=None) -> str:
@@ -104,7 +98,7 @@ def build_network(
             name=line["name"],
             from_zone=line["from_zone"],
             to_zone=line["to_zone"],
-            reactance=_reactance_pu(line["reactance_ohm"], line["kv"]),
+            reactance=reactance_pu(line["reactance_ohm"], line["kv"]),
             rating=line["rating"],
         )
         for line in lines

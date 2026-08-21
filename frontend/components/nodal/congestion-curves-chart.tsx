@@ -9,27 +9,20 @@ import { ChartTooltip } from "@/components/chart-tooltip";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
 import { formatNumber } from "@/lib/chart-format";
 import { useT } from "@/lib/i18n-context";
-import { toAvgPriceData, toPriceCurveData } from "@/lib/nodal-chart-data";
+import { toCongestionCurveData } from "@/lib/nodal-chart-data";
 import type { LmpRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const PALETTE = ["#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
-const AVG_PRICE_KEY = "lmp_avg";
-const AVG_PRICE_COLOR = "#ffffff";
 
-interface PriceCurvesChartProps {
+interface CongestionCurvesChartProps {
   rows: LmpRow[];
   hour: number;
 }
 
-export function PriceCurvesChart({ rows, hour }: PriceCurvesChartProps) {
+export function CongestionCurvesChart({ rows, hour }: CongestionCurvesChartProps) {
   const t = useT();
-  const { data: zoneData, seriesKeys } = useMemo(() => toPriceCurveData(rows), [rows]);
-  const avgData = useMemo(() => toAvgPriceData(rows), [rows]);
-  const data = useMemo(
-    () => zoneData.map((point, i) => ({ ...point, [AVG_PRICE_KEY]: avgData[i]?.lmp_avg ?? 0 })),
-    [zoneData, avgData],
-  );
+  const { data, seriesKeys } = useMemo(() => toCongestionCurveData(rows), [rows]);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const { wrapperRef, visibleData, isZoomed, reset, getWrapperProps } = useChartZoom(data);
 
@@ -37,10 +30,9 @@ export function PriceCurvesChart({ rows, hour }: PriceCurvesChartProps) {
     return <div className="py-12 text-center text-sm text-muted-foreground">{t("chart.pricesNoData")}</div>;
   }
 
-  const legendItems: ChartLegendItem[] = [
-    ...seriesKeys.map((key, index) => ({ key, name: key, color: PALETTE[index % PALETTE.length] })),
-    { key: AVG_PRICE_KEY, name: t("nodal.avgPrice"), color: AVG_PRICE_COLOR },
-  ];
+  const legendItems: ChartLegendItem[] = seriesKeys.map((key, index) => ({
+    key, name: key, color: PALETTE[index % PALETTE.length],
+  }));
 
   const toggleSeries = (key: string) => {
     setHidden((prev) => {
@@ -76,9 +68,6 @@ export function PriceCurvesChart({ rows, hour }: PriceCurvesChartProps) {
                 stroke={PALETTE[index % PALETTE.length]} dot={false} strokeWidth={2}
                 hide={hidden.has(key)} />
             ))}
-            <Line key={AVG_PRICE_KEY} type="monotone" dataKey={AVG_PRICE_KEY}
-              name={t("nodal.avgPrice")} stroke={AVG_PRICE_COLOR} dot={false}
-              strokeWidth={3} strokeDasharray="6 4" hide={hidden.has(AVG_PRICE_KEY)} />
           </LineChart>
         </ResponsiveContainer>
       </div>

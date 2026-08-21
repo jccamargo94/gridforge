@@ -19,10 +19,10 @@ const GENERATORS = [
     initial_status: 1, ramp_rate: null },
 ];
 const LMP_ROWS: LmpRow[] = [
-  { timestamp: "2024-04-18 00:00", bus: "norte", lmp: 20 },
-  { timestamp: "2024-04-18 00:00", bus: "centro", lmp: 30 },
-  { timestamp: "2024-04-18 00:00", bus: "sur", lmp: 40 },
-  { timestamp: "2024-04-18 01:00", bus: "norte", lmp: 21 },
+  { timestamp: "2024-04-18 00:00", bus: "norte", lmp: 20, lmp_avg: 20, lmp_congestion: 0 },
+  { timestamp: "2024-04-18 00:00", bus: "centro", lmp: 30, lmp_avg: 30, lmp_congestion: 0 },
+  { timestamp: "2024-04-18 00:00", bus: "sur", lmp: 40, lmp_avg: 40, lmp_congestion: 0 },
+  { timestamp: "2024-04-18 01:00", bus: "norte", lmp: 21, lmp_avg: 21, lmp_congestion: 0 },
 ];
 const LOADS: NodalBusLoad[] = [
   { zone: "norte", p_load: Array.from({ length: 24 }, (_, i) => 100 + i) },

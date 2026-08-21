@@ -160,10 +160,14 @@ export interface NodalResult {
   redistribution: NodalRedistributionRow[];
   gen_revenue_by_zone: NodalGenRevenueRow[];
   network: NodalNetwork;
+  price_series: PricePoint[] | null;
   artifacts: Record<NodalArtifactName, boolean>;
 }
 
-export interface LmpRow { timestamp: string; bus: string; lmp: number; }
+export interface LmpRow {
+  timestamp: string; bus: string; lmp: number;
+  lmp_avg: number; lmp_congestion: number;
+}
 
 export interface NodalDispatchRow {
   generator: string; zone: string; fuel: string; hour: number; dispatch_mw: number;

@@ -44,3 +44,29 @@ def test_uc_path_matches_dcopf_on_constant_loads():
         assert all(v in (0.0, 1.0) for g in sol.commitment for v in sol.commitment[g])
         assert sol.uc_total_cost is not None and sol.uc_total_cost > 0
         assert math.isclose(sol.total_cost, sol.uc_total_cost, rel_tol=1e-6)
+
+
+def test_congested_lmp_avg_and_congestion_are_load_weighted():
+    sol = EgretNodalEngine().solve(
+        make_three_zone_network(congested=True), use_unit_commitment=False
+    )
+    t = 0
+    assert math.isclose(sol.lmp_avg[t], 60.0, abs_tol=1e-6)
+    assert math.isclose(sol.lmp_congestion["norte"][t], -40.0, abs_tol=1e-4)
+    assert math.isclose(sol.lmp_congestion["centro"][t], 20.0, abs_tol=1e-4)
+    assert math.isclose(sol.lmp_congestion["sur"][t], 20.0, abs_tol=1e-4)
+    for bus in sol.buses:
+        for h in range(24):
+            assert math.isclose(
+                sol.lmp[bus][h], sol.lmp_avg[h] + sol.lmp_congestion[bus][h], abs_tol=1e-6
+            )
+
+
+def test_uncongested_lmp_avg_equals_lmp_no_congestion():
+    sol = EgretNodalEngine().solve(
+        make_three_zone_network(congested=False), use_unit_commitment=False
+    )
+    for t in range(24):
+        assert math.isclose(sol.lmp_avg[t], 20.0, abs_tol=1e-6)
+        for bus in sol.buses:
+            assert math.isclose(sol.lmp_congestion[bus][t], 0.0, abs_tol=1e-6)

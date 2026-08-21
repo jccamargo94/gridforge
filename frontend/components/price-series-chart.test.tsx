@@ -58,4 +58,18 @@ describe("PriceSeriesChart", () => {
     await user.click(screen.getByRole("button", { name: /modelo mpo/i }));
     expect(container.querySelectorAll(".recharts-line").length).toBe(2);
   });
+
+  it("uses custom label keys when provided", () => {
+    render(
+      <I18nProvider>
+        <PriceSeriesChart
+          points={[{ datetime: "2024-04-18T00:00:00", model_mpo: 10, xm_mpo: 20 }]}
+          modelLabelKey="nodal.avgPriceModelLabel"
+          xmLabelKey="nodal.bolsaRealLabel"
+        />
+      </I18nProvider>,
+    );
+    expect(screen.getByText("Precio promedio ponderado")).toBeInTheDocument();
+    expect(screen.getByText("Bolsa real")).toBeInTheDocument();
+  });
 });

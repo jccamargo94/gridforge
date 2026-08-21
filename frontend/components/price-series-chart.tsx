@@ -36,7 +36,17 @@ function toChartData(points: PricePoint[]) {
     .sort((a, b) => a.hour - b.hour);
 }
 
-export function PriceSeriesChart({ points }: { points: PricePoint[] | null }) {
+interface PriceSeriesChartProps {
+  points: PricePoint[] | null;
+  modelLabelKey?: string;
+  xmLabelKey?: string;
+}
+
+export function PriceSeriesChart({
+  points,
+  modelLabelKey = "runDetail.modelMpo",
+  xmLabelKey = "runDetail.xmMpo",
+}: PriceSeriesChartProps) {
   const t = useT();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
 
@@ -65,7 +75,7 @@ export function PriceSeriesChart({ points }: { points: PricePoint[] | null }) {
 
   const legendItems = SERIES.map((s) => ({
     key: s.key,
-    name: t(s.key === "model_mpo" ? "runDetail.modelMpo" : "runDetail.xmMpo"),
+    name: t(s.key === "model_mpo" ? modelLabelKey : xmLabelKey),
     color: s.color,
   }));
 
@@ -118,7 +128,7 @@ export function PriceSeriesChart({ points }: { points: PricePoint[] | null }) {
                 key={s.key}
                 type="monotone"
                 dataKey={s.key}
-                name={t(s.key === "model_mpo" ? "runDetail.modelMpo" : "runDetail.xmMpo")}
+                name={t(s.key === "model_mpo" ? modelLabelKey : xmLabelKey)}
                 stroke={s.color}
                 dot={false}
                 hide={hidden.has(s.key)}

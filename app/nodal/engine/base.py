@@ -12,6 +12,8 @@ class NodalSolution:
     buses: list[str]
     reference_zone: str
     lmp: dict[str, list[float]]
+    lmp_avg: list[float]
+    lmp_congestion: dict[str, list[float]]
     dispatch: dict[str, list[float]]
     loads: dict[str, list[float]]
     branch_flows: dict[str, list[float]]

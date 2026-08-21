@@ -17,8 +17,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { NetworkCard } from "@/components/nodal/network-card";
 import { ZonalMap } from "@/components/nodal/zonal-map";
 import { PriceCurvesChart } from "@/components/nodal/price-curves-chart";
+import { CongestionCurvesChart } from "@/components/nodal/congestion-curves-chart";
 import { NodalDispatchChart } from "@/components/nodal/nodal-dispatch-chart";
 import { BranchFlowsChart } from "@/components/nodal/branch-flows-chart";
+import { PriceSeriesChart } from "@/components/price-series-chart";
 import { DifferentialTable } from "@/components/nodal/differential-table";
 import { RedistributionMatrix } from "@/components/nodal/redistribution-matrix";
 import { NodalArtifactDownloads } from "@/components/nodal/nodal-artifact-downloads";
@@ -172,7 +174,31 @@ export default function NodalDashboardPage() {
           <CardDescription>{t("nodal.priceCurvesSubtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <PriceCurvesChart rows={lmpQuery.data ?? []} referenceZone={nodal.network.reference_zone} hour={hour} />
+          <PriceCurvesChart rows={lmpQuery.data ?? []} hour={hour} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("nodal.congestionCurvesTitle")}</CardTitle>
+          <CardDescription>{t("nodal.congestionCurvesSubtitle")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CongestionCurvesChart rows={lmpQuery.data ?? []} hour={hour} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("nodal.priceComparisonTitle")}</CardTitle>
+          <CardDescription>{t("nodal.priceComparisonSubtitle")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PriceSeriesChart
+            points={nodal.price_series}
+            modelLabelKey="nodal.avgPriceModelLabel"
+            xmLabelKey="nodal.bolsaRealLabel"
+          />
         </CardContent>
       </Card>
 

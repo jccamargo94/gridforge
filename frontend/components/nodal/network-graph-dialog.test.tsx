@@ -85,6 +85,34 @@ describe("NetworkGraphDialog", () => {
     expect(screen.queryByText("G_S1")).not.toBeInTheDocument();
   });
 
+  it("expands zones via an accessible pill button and formats numbers", async () => {
+    renderDialog(fixture);
+
+    fireEvent.click(screen.getByRole("button", { name: /ver grafo/i }));
+
+    // Wait for the lazily imported graph to mount before querying the pills.
+    await screen.findByText("norte", {}, { timeout: 15000 });
+
+    // jsdom has no layout engine, so React Flow keeps node wrappers
+    // visibility:hidden until it measures them; reveal them so role queries
+    // (which respect the accessibility tree) can see the pills.
+    document.querySelectorAll<HTMLElement>(".react-flow__node").forEach((n) => {
+      n.style.visibility = "visible";
+    });
+
+    // The reference zone pill announces the expand action and its reference
+    // role (not by color alone).
+    const pill = screen.getByRole("button", { name: /ampliar zona: norte/i });
+    expect(pill.getAttribute("aria-label")).toMatch(/zona de referencia/i);
+
+    fireEvent.click(pill);
+
+    // Card capacity formatted with one decimal; peak demand appears formatted
+    // on both the expanded card and the detail panel.
+    expect(await screen.findByText("150.0", {}, { timeout: 15000 })).toBeInTheDocument();
+    expect(screen.getAllByText("90.0").length).toBeGreaterThanOrEqual(1);
+  }, 20000);
+
   it("shows empty-state messages for a zone without generators or branches", async () => {
     const sparse: NodalNetwork = {
       ...fixture,

@@ -126,6 +126,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "nodalNetwork.graph.noGenerators": "Sin generadores en esta zona",
     "nodalNetwork.graph.noBranches": "Sin ramas conectadas a esta zona",
     "nodalNetwork.graph.zoneDetails": "Detalle de zona",
+    "nodalNetwork.graph.expandZone": "Ampliar zona",
 
     "runsTable.date": "Fecha",
     "runsTable.level": "Nivel",
@@ -400,6 +401,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "nodalNetwork.graph.noGenerators": "No generators in this zone",
     "nodalNetwork.graph.noBranches": "No branches connected to this zone",
     "nodalNetwork.graph.zoneDetails": "Zone details",
+    "nodalNetwork.graph.expandZone": "Expand zone",
 
     "runsTable.date": "Date",
     "runsTable.level": "Level",

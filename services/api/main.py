@@ -135,6 +135,40 @@ def _price_series(run, case) -> list[dict] | None:
     return df.to_dict(orient="records")
 
 
+def _nodal_price_comparison_df(nodal_result, case) -> pd.DataFrame | None:
+    """Precio promedio ponderado (lmp_avg, from the lmp.csv artifact) aligned
+    with the real bolsa price, one row per hour. None when either source is
+    missing."""
+    if nodal_result is None or nodal_result.lmp_path is None:
+        return None
+    storage = get_storage(".")
+    if not storage.exists(nodal_result.lmp_path):
+        return None
+    try:
+        with storage.open(nodal_result.lmp_path) as f:
+            df = pd.read_csv(f)
+        xm = load_reference_price(case.dispatch_date, level=case.level, data_dir="data")
+    except (FileNotFoundError, ValueError, KeyError):
+        return None
+    hourly = df.drop_duplicates(subset="timestamp").sort_values("timestamp").reset_index(drop=True)
+    model_avg = hourly["lmp_avg"].astype(float).tolist()
+    n = min(len(model_avg), len(xm))
+    return pd.DataFrame(
+        {
+            "datetime": [f"{case.dispatch_date}T{h:02d}:00:00" for h in range(n)],
+            "model_mpo": model_avg[:n],
+            "xm_mpo": [float(x) for x in xm[:n]],
+        }
+    )
+
+
+def _nodal_price_series(nodal_result, case) -> list[dict] | None:
+    df = _nodal_price_comparison_df(nodal_result, case)
+    if df is None:
+        return None
+    return df.to_dict(orient="records")
+
+
 def _nodal_summary(session, run_id: str) -> dict | None:
     nodal = queries.get_nodal_result(session, run_id)
     if nodal is None or not nodal.network:
@@ -309,6 +343,7 @@ def get_run_detail(
             "redistribution": nodal_result.redistribution,
             "gen_revenue_by_zone": nodal_result.gen_revenue_by_zone,
             "network": nodal_result.network,
+            "price_series": _nodal_price_series(nodal_result, case),
             "artifacts": {
                 name: getattr(nodal_result, attr) is not None
                 for name, attr in _NODAL_ARTIFACT_PATHS.items()

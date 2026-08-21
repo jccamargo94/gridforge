@@ -1,3 +1,4 @@
+import math
 from datetime import date
 
 import pandas as pd
@@ -25,7 +26,13 @@ def _seed_done_nodal_run(api_client, tmp_path):
     out_dir.mkdir(parents=True)
 
     lmp_rows = [
-        {"timestamp": f"2024-04-18 {h:02d}:00", "bus": z, "lmp": 20.0 + h}
+        {
+            "timestamp": f"2024-04-18 {h:02d}:00",
+            "bus": z,
+            "lmp": 20.0 + h,
+            "lmp_avg": 20.0 + h,
+            "lmp_congestion": 0.0,
+        }
         for h in range(24)
         for z in ZONES
     ]
@@ -178,3 +185,22 @@ def test_nodal_run_ownership_404(api_client, tmp_path):
     session.close()
     resp = api_client.get(f"/runs/{run_id}/nodal/lmp")
     assert resp.status_code == 404
+
+
+def test_get_nodal_run_detail_includes_price_series(api_client, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "services.api.main.load_reference_price",
+        lambda dispatch_date, level, data_dir="data": [float(i) for i in range(24)],
+    )
+    run_id = _seed_done_nodal_run(api_client, tmp_path)
+
+    resp = api_client.get(f"/runs/{run_id}")
+    assert resp.status_code == 200
+    price_series = resp.json()["nodal"]["price_series"]
+
+    assert len(price_series) == 24
+    assert price_series[0]["datetime"] == "2024-04-18T00:00:00"
+    assert math.isclose(price_series[0]["model_mpo"], 20.0)
+    assert math.isclose(price_series[0]["xm_mpo"], 0.0)
+    assert math.isclose(price_series[23]["model_mpo"], 43.0)
+    assert math.isclose(price_series[23]["xm_mpo"], 23.0)

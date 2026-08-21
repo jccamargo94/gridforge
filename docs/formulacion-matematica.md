@@ -91,3 +91,70 @@ Para fechas recientes donde la demanda/disponibilidad comercial real aún no se
 publica (rezago de ~3 días), el modo ideal cae al pronóstico PrId y a la
 disponibilidad declarada, **emitiendo una advertencia** para distinguir la corrida
 de una que usó datos reales.
+
+## Despacho nodal y precios locacionales (LMP)
+
+Los dos niveles anteriores (preideal, ideal) resuelven un balance de potencia
+único — el sistema se trata como una única barra ("copperplate"), sin límites
+de transmisión entre zonas. El nivel **`lmp`** reemplaza ese balance por un
+**DC-OPF** (flujo de potencia óptimo en corriente continua, formulación
+`btheta`) sobre una red nodal explícita: zonas (subáreas operativas del SIN),
+ramas de transmisión con reactancia y capacidad, y una zona de referencia.
+Este nivel usa un motor de resolución distinto al modelo Pyomo propio del
+repositorio (`app/model/`): se apoya en
+[EGRET](https://github.com/grid-parity-exchange/Egret) (Sandia National
+Labs) para el unit commitment + DC-OPF conjunto.
+
+### Restricción de flujo DC
+
+Para cada rama $(i,j)$ con reactancia $x_{ij}$ y ángulo de fase $\theta$ por
+zona:
+
+$$f_{ij,t} = \frac{\theta_{i,t} - \theta_{j,t}}{x_{ij}}, \qquad -F^{max}_{ij} \le f_{ij,t} \le F^{max}_{ij}$$
+
+El balance de potencia se aplica **por zona** en lugar de a nivel sistema:
+
+$$\sum_{g \in zona} p_{g,t} + \sum_{ij \in zona} f_{ij,t} = D_{zona,t}, \qquad \forall zona, t$$
+
+### Precio locacional (LMP)
+
+El dual de este balance por zona es el precio locacional (**LMP**) de esa
+zona en esa hora. A diferencia del MPO de sistema único, el LMP puede
+diferir entre zonas cuando una rama opera en su límite (**congestión**).
+
+Para reportar un único precio de referencia comparable con el MPO/bolsa de
+sistema único, el precio del sistema se calcula como el **promedio ponderado
+por demanda** de los LMP zonales, no como el LMP de una zona arbitraria (el
+LMP de una zona individual depende de la elección de barra de referencia y no
+es, por construcción, un precio de sistema bien definido):
+
+$$MPO^{sistema}_t = \frac{\sum_{zona} D_{zona,t} \cdot LMP_{zona,t}}{\sum_{zona} D_{zona,t}}$$
+
+El componente de **congestión** de cada zona se reporta como la diferencia
+entre su LMP y ese promedio ponderado:
+
+$$Congestión_{zona,t} = LMP_{zona,t} - MPO^{sistema}_t$$
+
+### Liquidación y renta de congestión
+
+El resultado nodal calcula dos regímenes de liquidación en paralelo para
+comparar el efecto de introducir precios locacionales:
+
+- **Status quo**: liquidación uniforme (todas las zonas pagan/reciben al
+  mismo precio de sistema), como en los niveles preideal/ideal.
+- **LMP**: cada zona liquida a su propio precio locacional.
+
+La diferencia entre ambos regímenes (redistribución entre zonas, renta de
+congestión, ingreso por generador y por zona) se calcula y expone como
+artefacto de resultado, junto con la topología de red utilizada y el flujo
+por rama.
+
+### Topología de entrada
+
+La red nodal se obtiene con `python -m app scrape-topology`, que construye
+un `NodalNetwork` (zonas, generadores, ramas, cargas y participación de
+demanda por zona) a partir de PARATEC (líneas, transformadores, subestaciones
+por subárea operativa) y SIMEM (catálogo de áreas/subáreas). El alcance por
+defecto (`--scope subarea`) agrupa por subárea operativa del SIN, excluyendo
+subáreas fronterizas (interconexiones con Ecuador y Venezuela) — típicamente
+resulta en 18 zonas domésticas.

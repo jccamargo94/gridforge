@@ -156,6 +156,14 @@ Conceptualmente se quiere soportar tres modos:
 Una meta importante es separar estos modos en una configuracion explicita de
 escenario BESS, en vez de depender solo del nombre del `dispatch_type`.
 
+### Nivel `lmp` (despacho nodal)
+
+Ademas de `dispatch_type` (variantes del modelo Pyomo de barra unica), existe
+un `DispatchLevel.lmp` ortogonal: reemplaza el modelo Pyomo propio por un
+DC-OPF nodal resuelto con EGRET, sobre una red de zonas/ramas de transmision.
+Calcula precio locacional (LMP) y congestion por zona en vez de un unico MPO
+de sistema. Ver la seccion "Topologia PARATEC -> red nodal" mas abajo.
+
 ---
 
 ## 4. Conceptos importantes
@@ -682,6 +690,10 @@ Antes de construir API/frontend, conviene cerrar estas piezas:
    lanzar y comparar corridas.
 6. **Forecast** — pendiente (Fase 5, sin diseno aun): producir insumos futuros
    con supuestos explicitos de precios de oferta, disponibilidad y demanda.
+7. **Red nodal y LMP** — hecho (Fase 6): scraper de topologia PARATEC/SIMEM,
+   nivel de despacho `lmp` (DC-OPF via EGRET), precios locacionales y
+   congestion por zona, liquidacion comparada, visor de red y dashboard
+   nodal en el frontend.
 
 ---
 

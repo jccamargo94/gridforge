@@ -39,6 +39,9 @@ sistemas de almacenamiento en batería (BESS). Se distribuye como librería Pyth
   precio y despacho.
 - Incorpora escenarios BESS declarativos bajo distintos niveles de penetración y
   modos de participación.
+- Modela la red de transmisión del SIN (zonas/subáreas, ramas y capacidades) y
+  resuelve un despacho **nodal** vía DC-OPF para calcular precios locacionales
+  (**LMP**) y congestión entre zonas.
 
 ## Variantes de despacho
 
@@ -46,6 +49,7 @@ sistemas de almacenamiento en batería (BESS). Se distribuye como librería Pyth
 |---|---|---|---|
 | **Preideal** | Pronóstico PrId (día previo) | Disponibilidad declarada | MPO de iMAR |
 | **Ideal** | Demanda comercial real (demaCome) | Disponibilidad comercial real (dispo_come) | **Precio de bolsa real** (PrecBolsNaci) y MPO de iMAR |
+| **Nodal (LMP)** | Comercial real o pronóstico | Comercial real o declarada | Red nodal (DC-OPF) — precio locacional y congestión por zona |
 
 Para fechas recientes, donde XM aún no publica la demanda/disponibilidad
 comercial real (rezago de ~3 días), el modo ideal cae automáticamente al
@@ -89,10 +93,15 @@ recientes es consistente con la heurística de ofertas estimadas.
 
 ## Cómo navegar el proyecto
 
-- `app/model/` — modelo Pyomo, variables y restricciones.
+- `app/model/` — modelo Pyomo (preideal/ideal), variables y restricciones.
+- `app/nodal/` — motor de despacho nodal (DC-OPF vía EGRET), precios
+  locacionales y liquidación de congestión.
 - `app/pipeline/` — construcción del caso, ejecución, guardado y evaluación.
 - `app/data/` — carga, descarga y parsing de insumos XM.
+- `app/data/topology/` — scraper PARATEC/SIMEM que construye la red nodal
+  (zonas, ramas, capacidades).
 - `services/api/` — API FastAPI para ejecutar y consultar corridas.
 - `services/worker/` — worker de polling que reclama y ejecuta corridas.
-- `frontend/` — interfaz Next.js para crear corridas y visualizar resultados.
+- `frontend/` — interfaz Next.js para crear corridas y visualizar resultados,
+  incluyendo el visor de red nodal y el dashboard de precios/congestión.
 - `tests/` — suite pytest para validación del pipeline y del CLI.

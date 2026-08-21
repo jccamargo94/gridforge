@@ -93,6 +93,15 @@ describe("aggregateGenRevenueByZoneFuel", () => {
   it("returns an empty list for no rows", () => {
     expect(aggregateGenRevenueByZoneFuel([])).toEqual([]);
   });
+
+  it("keys distinct (zone, fuel) pairs with a real separator, not concatenation", () => {
+    const rows = [
+      { zone: "a", fuel: "bc", revenue_a: 100, revenue_b: 100, delta: 0 },
+      { zone: "ab", fuel: "c", revenue_a: 50, revenue_b: 50, delta: 0 },
+    ];
+    const result = aggregateGenRevenueByZoneFuel(rows);
+    expect(result).toHaveLength(2);
+  });
 });
 
 describe("toAvgPriceData", () => {

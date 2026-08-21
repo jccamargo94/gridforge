@@ -199,6 +199,25 @@ Entidades iniciales para la app:
 - Permitir ejecuciones para semanas futuras con advertencias explicitas sobre
   supuestos.
 
+### Fase 6: Red nodal y precios locacionales (LMP)
+
+- Scraper de topologia PARATEC + catalogo de areas/subareas SIMEM
+  (`scrape-topology`), que construye una `NodalNetwork` (zonas, generadores,
+  ramas de transmision, cargas) con alcance por subarea operativa por
+  defecto (18 zonas domesticas tras excluir subareas fronterizas).
+- Nuevo nivel de despacho `lmp`: DC-OPF nodal via EGRET (motor distinto al
+  modelo Pyomo propio de `app/model/`), con calculo de precio locacional
+  (LMP) por zona y componente de congestion respecto al precio promedio
+  ponderado por demanda.
+- Liquidacion comparada: renta de congestion y redistribucion entre regimen
+  de precio uniforme (status quo) y regimen LMP, por zona y por generador.
+- Frontend: visor de red interactivo (React Flow) en el editor de creacion
+  de corridas, y dashboard nodal de resultados (`/runs/[id]/nodal`) con
+  precios por zona, congestion, comparacion precio promedio ponderado vs.
+  bolsa real, flujo por rama y matriz de redistribucion.
+- Pendiente: `scope=area` del scraper de topologia (agrupacion a nivel area
+  operativa, mas gruesa que subarea) no esta implementado.
+
 ## Riesgos tecnicos principales
 
 - La construccion de casos historicos aun necesita validacion end-to-end contra

@@ -22,4 +22,9 @@ kramdown:
 # GitHub Pages defaults
 github: [metadata]
 
+# Internal SDD spec/plan pairs (docs/superpowers/) are not published site
+# pages — they contain literal `{{ }}` JSX/code snippets that break Liquid.
+exclude:
+  - superpowers/
+
 # MathJax is loaded in the head (see _includes/head.html); no plugin needed.

@@ -221,3 +221,47 @@ def ensure_ofertas_estimado(
         cached.to_csv(f, index=False)
 
     return estimated
+
+
+def prune_estimated_rows(data_dir: str, month_start: date, oferta_full: pd.DataFrame) -> int:
+    """Drop cached estimated rows superseded by a real monthly block.
+
+    The freshness tick's monthly gate calls this once real PrecOferDesp rows
+    cover `month_start`'s month (spec 2026-09-08-daily-runs, sections 5.1
+    and 5.2): an estimated (Date, resource_name) row whose pair the real
+    extraction now covers is stale — the real value replaced it — and
+    keeping it would only grow the cache forever. Estimated rows whose
+    resource the real block does not list survive: the rolling
+    `ultimo_precio` keeps carrying their last MPO resolution forward until
+    a real extraction covers them. Returns the number of rows pruned.
+    """
+    storage = get_storage(data_dir)
+    cache_path = f"ofertas_estimado/ofertas_estimado_{month_start.year}.csv"
+    if not storage.exists(cache_path):
+        return 0
+    with storage.open(cache_path, "rb") as f:
+        cached = pd.read_csv(f, parse_dates=["Date"])
+    if cached.empty:
+        return 0
+
+    if month_start.month == 12:
+        next_month = date(month_start.year + 1, 1, 1)
+    else:
+        next_month = date(month_start.year, month_start.month + 1, 1)
+    real = oferta_full[
+        (oferta_full["Date"] >= pd.Timestamp(month_start))
+        & (oferta_full["Date"] < pd.Timestamp(next_month))
+    ]
+    if real.empty:
+        return 0
+
+    covered = real[["Date", "resource_name"]].drop_duplicates().assign(_covered=True)
+    merged = cached.reset_index().merge(covered, on=["Date", "resource_name"], how="left")
+    stale_pos = merged["_covered"].notna()
+    if not stale_pos.any():
+        return 0
+
+    keep = cached.drop(index=merged.loc[stale_pos, "index"])
+    with storage.open(cache_path, "w") as f:
+        keep.to_csv(f, index=False)
+    return int(stale_pos.sum())

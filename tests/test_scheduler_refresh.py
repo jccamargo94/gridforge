@@ -116,3 +116,62 @@ def test_refresh_tick_gate_creates_settled_rows_when_month_completes(tmp_path):
         session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
     )
     assert again == 0
+
+
+def test_refresh_tick_gate_prunes_estimates_superseded_by_real_month(tmp_path):
+    """Wave-0 minor #4: the monthly gate prunes stale same-date estimates.
+
+    Estimates cached while April had no real rows are dropped once the real
+    April block covers the same (Date, resource) pair; rows for resources the
+    real block does not list survive (their MPO resolution must keep rolling,
+    spec section 5.2).
+    """
+    session = _session()
+    march_days = [date(2024, 3, 1) + timedelta(days=i) for i in range(31)]
+    local = pd.DataFrame(
+        [{"Date": pd.Timestamp(d), "resource_name": "SALTO II", "Value": 150.0} for d in march_days]
+    )
+    _write_year_csv(tmp_path, "ofertas", "ofertas_2024.csv", local)
+
+    # cache estimates for April dates (the month had no real rows yet): two
+    # will be covered by the real block, one belongs to a resource the real
+    # PrecOferDesp block does not list (GHOST never bids)
+    est_dir = tmp_path / "ofertas_estimado"
+    est_dir.mkdir()
+    estimated = pd.DataFrame(
+        [
+            {
+                "Date": pd.Timestamp("2024-04-05"),
+                "resource_name": "SALTO II",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+            {
+                "Date": pd.Timestamp("2024-04-06"),
+                "resource_name": "TERMO NORTE",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+            {
+                "Date": pd.Timestamp("2024-04-07"),
+                "resource_name": "GHOST",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+        ]
+    )
+    estimated.to_csv(est_dir / "ofertas_estimado_2024.csv", index=False)
+
+    now = datetime(2024, 5, 2, 12, 0, tzinfo=UTC)
+    consult = _FakeConsult(date(2024, 4, 1), date(2024, 5, 1))
+    created = refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    assert created == 60
+
+    remaining = pd.read_csv(
+        tmp_path / "ofertas_estimado" / "ofertas_estimado_2024.csv",
+        parse_dates=["Date"],
+    )
+    pairs = set(zip(remaining["Date"].dt.date, remaining["resource_name"]))
+    assert pairs == {(date(2024, 4, 7), "GHOST")}

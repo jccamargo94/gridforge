@@ -29,13 +29,15 @@ describe("Nodal list page", () => {
     vi.mocked(listRuns).mockResolvedValue([
       {
         run_id: "run-nodal-1", status: "done", dispatch_date: "2024-04-18",
-        level: "lmp", scenario_id: null, created_at: "2024-04-18T12:00:00Z",
+        level: "lmp", scenario_id: null, visibility: "private", input_grade: null,
+        created_at: "2024-04-18T12:00:00Z",
         started_at: null, finished_at: null, error: null,
         nodal: { network_name: "three_zone", zones: 3, generators: 3, branches: 2 },
       },
       {
         run_id: "run-classic-1", status: "done", dispatch_date: "2024-04-18",
-        level: "preideal", scenario_id: null, created_at: "2024-04-18T11:00:00Z",
+        level: "preideal", scenario_id: null, visibility: "private", input_grade: null,
+        created_at: "2024-04-18T11:00:00Z",
         started_at: null, finished_at: null, error: null, nodal: null,
       },
     ]);

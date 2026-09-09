@@ -1,7 +1,7 @@
 from datetime import date as date_
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, Scenario
@@ -38,8 +38,10 @@ def create_case_and_run(
     solver: str,
     compute_prices: bool,
     scenario_id: str | None,
-    user_id: str,
+    user_id: str | None = None,
     nodal_network: dict | None = None,
+    visibility: str = "private",
+    input_grade: str | None = None,
 ) -> Run:
     case = Case(
         dispatch_date=dispatch_date,
@@ -52,7 +54,13 @@ def create_case_and_run(
     session.add(case)
     session.flush()  # populate case.id before Run references it
 
-    run = Run(case_id=case.id, user_id=user_id, status="pending")
+    run = Run(
+        case_id=case.id,
+        user_id=user_id,
+        status="pending",
+        visibility=visibility,
+        input_grade=input_grade,
+    )
     session.add(run)
     session.commit()
     session.refresh(run)
@@ -77,7 +85,14 @@ def get_metric_set(session: Session, run_id: str) -> MetricSet | None:
     return session.scalars(stmt).first()
 
 
-def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -> None:
+def finish_run_ok(
+    session: Session,
+    run: Run,
+    result: RunResult,
+    out_dir: str,
+    *,
+    reference: str | None = None,
+) -> None:
     run.status = "done"
     run.finished_at = datetime.now(timezone.utc)
     run.out_dir = out_dir
@@ -105,6 +120,8 @@ def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -
                 bess_net_revenue=bess.get("bess_net_revenue"),
                 dispatch_mae_mw=metrics.get("dispatch_mae_mw"),
                 dispatch_rmse_mw=metrics.get("dispatch_rmse_mw"),
+                reference=reference,
+                evaluated_at=datetime.now(timezone.utc) if reference else None,
             )
         )
     session.commit()
@@ -201,3 +218,37 @@ def get_input_dataset(session: Session, dataset: str, partition_key: str) -> Inp
         InputDataset.dataset == dataset, InputDataset.partition_key == partition_key
     )
     return session.scalars(stmt).first()
+
+
+def update_metric_set(
+    session: Session, run_id: str, *, metrics: dict[str, float], reference: str
+) -> MetricSet:
+    """Overwrite a run's price metrics against an explicit reference.
+
+    Keeps the dispatch columns (dispatch_mae_mw/dispatch_rmse_mw) untouched —
+    they need the solved model, which post-hoc re-evaluation does not have.
+    """
+    ms = get_metric_set(session, run_id)
+    if ms is None:
+        ms = MetricSet(run_id=run_id)
+    ms.rmse = metrics.get("rmse")
+    ms.mae = metrics.get("mae")
+    ms.bias = metrics.get("bias")
+    ms.wape = metrics.get("wape")
+    ms.smape = metrics.get("smape")
+    ms.r2 = metrics.get("r2")
+    ms.reference = reference
+    ms.evaluated_at = datetime.now(timezone.utc)
+    session.add(ms)
+    session.commit()
+    session.refresh(ms)
+    return ms
+
+
+def list_visible_runs(session: Session, user_id: str) -> list[Run]:
+    stmt = (
+        select(Run)
+        .where(or_(Run.user_id == user_id, Run.visibility == "public"))
+        .order_by(Run.created_at.desc())
+    )
+    return list(session.scalars(stmt))

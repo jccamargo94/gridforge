@@ -39,6 +39,12 @@ def _pull_start(name: str, end_day: date, config, data_dir: str) -> date:
     window_edge = end_day - timedelta(days=config.data_refresh_window_days)
     last = inputs.series_max_date(name, end_day.year, data_dir)
     if last is None:
+        # Year rollover: the end-day-year CSV does not exist yet (first pulls
+        # of a new year), so consult the previous year's file. Otherwise the
+        # December monthly block (published ~Jan 1) would only be reachable
+        # from the bare window edge and Dec 1-24 would never be pulled again.
+        last = inputs.series_max_date(name, end_day.year - 1, data_dir)
+    if last is None:
         return window_edge
     return min(window_edge, last + timedelta(days=1))
 
@@ -65,18 +71,22 @@ def refresh_tick(session, *, now, config, data_dir: str = "data", consult=None) 
     needs_crosswalk = any(needs for _, _, needs in _SERIES)
     crosswalk = xm_bulk.fetch_resource_crosswalk(consult_obj) if needs_crosswalk else None
 
-    for name, refresh_fn, uses_crosswalk in _SERIES:
-        start = _pull_start(name, end_day, config, data_dir)
-        for seg_start, seg_end in _year_segments(start, end_day):
-            refresh_fn(
-                seg_start,
-                seg_end,
-                data_dir,
-                consult_obj,
-                crosswalk if uses_crosswalk else None,
-                session=session,
-            )
-    loaders.clear_loader_caches()
+    try:
+        for name, refresh_fn, uses_crosswalk in _SERIES:
+            start = _pull_start(name, end_day, config, data_dir)
+            for seg_start, seg_end in _year_segments(start, end_day):
+                refresh_fn(
+                    seg_start,
+                    seg_end,
+                    data_dir,
+                    consult_obj,
+                    crosswalk if uses_crosswalk else None,
+                    session=session,
+                )
+    finally:
+        # Always invalidate: a mid-batch failure must not leave workers
+        # reading stale loader frames until the next successful tick.
+        loaders.clear_loader_caches()
 
     month = plans.next_settlement_month(session, now=now, config=config, data_dir=data_dir)
     if month is None:

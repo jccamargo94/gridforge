@@ -31,7 +31,8 @@ def test_series_has_day_and_max_date():
 
 
 def test_month_complete_false_when_fixture_month_partial():
-    # the fixture only has 2024-04-18 rows -> April is not complete
+    # the fixture's ofertas cover a complete synthetic March 2024 plus a
+    # single April day (2024-04-18) -> April is still not complete
     assert inputs.month_complete("ofertas", date(2024, 4, 1), DD) is False
 
 

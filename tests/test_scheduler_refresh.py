@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,6 @@ from app.scheduler.config import SchedulerConfig
 
 UTC = timezone.utc
 CONFIG = SchedulerConfig()
-DD = str(Path(__file__).parent / "fixtures" / "xm_smoke")
 
 
 def _session():
@@ -175,3 +174,61 @@ def test_refresh_tick_gate_prunes_estimates_superseded_by_real_month(tmp_path):
     )
     pairs = set(zip(remaining["Date"].dt.date, remaining["resource_name"]))
     assert pairs == {(date(2024, 4, 7), "GHOST")}
+
+
+def test_pull_start_year_rollover_reaches_back_past_window_edge(tmp_path):
+    """F2 regression: first pulls of a new year have no end-year CSV yet.
+
+    Reach-back must then consult the previous year's file (last local row
+    2024-11-30), so the request starts 2024-12-01 and the December monthly
+    block arrives whole. Stopping at the bare window edge (2024-12-25) would
+    leave Dec 1-24 unreachable forever (_year_segments never returns to it).
+    """
+    nov_days = [date(2024, 11, 1) + timedelta(days=i) for i in range(30)]
+    local = pd.DataFrame(
+        [{"Date": pd.Timestamp(d), "resource_name": "SALTO II", "Value": 150.0} for d in nov_days]
+    )
+    _write_year_csv(tmp_path, "ofertas", "ofertas_2024.csv", local)
+
+    start = refresh_mod._pull_start("ofertas", date(2025, 1, 1), CONFIG, str(tmp_path))
+    assert start == date(2024, 12, 1)
+    assert refresh_mod._year_segments(start, date(2025, 1, 1)) == [
+        (date(2024, 12, 1), date(2024, 12, 31)),
+        (date(2025, 1, 1), date(2025, 1, 1)),
+    ]
+
+
+def test_pull_start_rollover_without_prev_year_file_keeps_window_edge(tmp_path):
+    # fresh install: neither the end-year nor the previous-year CSV exists ->
+    # behavior unchanged, bare window edge
+    start = refresh_mod._pull_start("ofertas", date(2025, 1, 1), CONFIG, str(tmp_path))
+    assert start == date(2024, 12, 25)
+
+
+def _boom(*args, **kwargs):
+    raise RuntimeError("simulated refresh failure")
+
+
+def test_refresh_tick_clears_loader_cache_even_when_a_refresh_raises(tmp_path, monkeypatch):
+    """Minor-3 regression: a mid-batch refresh failure must not leave stale
+    loader frames cached; clear_loader_caches() runs even when the tick
+    propagates the exception."""
+    session = _session()
+    cleared = []
+    monkeypatch.setattr(loaders_mod, "clear_loader_caches", lambda: cleared.append(True))
+    series = [
+        (name, _boom if name == "precio_bolsa" else fn, uses)
+        for name, fn, uses in refresh_mod._SERIES
+    ]
+    monkeypatch.setattr(refresh_mod, "_SERIES", series)
+
+    consult = _FakeConsult(date(2024, 4, 13), date(2024, 4, 19))
+    with pytest.raises(RuntimeError, match="simulated refresh failure"):
+        refresh_mod.refresh_tick(
+            session,
+            now=datetime(2024, 4, 20, 12, 0, tzinfo=UTC),
+            config=CONFIG,
+            data_dir=str(tmp_path),
+            consult=consult,
+        )
+    assert cleared == [True]

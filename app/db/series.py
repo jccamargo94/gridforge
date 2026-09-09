@@ -17,7 +17,9 @@ DST); everything is stored as aware UTC instants.
 
 from __future__ import annotations
 
+import argparse
 import logging
+import os
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Sequence
 from zoneinfo import ZoneInfo
@@ -30,7 +32,8 @@ from sqlalchemy.orm import Session
 
 from app.data import loaders
 from app.data.actuals import load_actual_price
-from app.db.models import HourlySeries, Run, TenantMember
+from app.db.models import Base, HourlySeries, Run, TenantMember
+from app.db.session import get_engine
 from app.storage import get_storage
 
 UTC = timezone.utc
@@ -263,3 +266,96 @@ def ingest_run_price_rows(session: Session, run: Run) -> int:
         for ts, value in pairs
     ]
     return upsert_hourly_rows(session, rows)
+
+
+def _history_bounds(data_dir: str) -> tuple[date, date]:
+    """Span of the historical precio_bolsa year CSVs under `data_dir`."""
+    try:
+        names = get_storage(data_dir).list_dir("precio_bolsa")
+    except OSError as exc:
+        raise ValueError(
+            f"no se pudo listar {data_dir}/precio_bolsa para el backfill ({exc})"
+        ) from exc
+    years = sorted(
+        int(name[len("precio_bolsa_") : -4])
+        for name in names
+        if name.startswith("precio_bolsa_") and name.endswith(".csv")
+    )
+    if not years:
+        raise ValueError(
+            f"no hay CSVs historicos precio_bolsa_*.csv bajo {data_dir}/precio_bolsa; "
+            "pase --start/--end explicitos"
+        )
+    return date(years[0], 1, 1), date(years[-1], 12, 31)
+
+
+def backfill_externals(
+    session: Session,
+    *,
+    data_dir: str = "data",
+    start: date | None = None,
+    end: date | None = None,
+) -> int:
+    """REQ-HS-06: replay external hourly rows from the historical CSVs.
+
+    With no explicit bounds the full span of the historical year CSVs is
+    replayed. Idempotent: re-running upserts the same rows in place.
+    """
+    if start is None or end is None:
+        lo, hi = _history_bounds(data_dir)
+        start = start or lo
+        end = end or hi
+    return ingest_external_window(session, start=start, end_day=end, data_dir=data_dir)
+
+
+def backfill_run_rows(session: Session) -> int:
+    """REQ-HS-06: replay hourly rows of every done run (covers runs finished
+    before the finish-time writer existed). Same helper -> idempotent."""
+    runs = list(session.scalars(select(Run).where(Run.status == "done")))
+    total = 0
+    for run in runs:
+        total += ingest_run_price_rows(session, run)
+    return total
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """One-time `hourly_series` backfill entrypoint (`python -m app.db.series`)."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.db.series",
+        description=(
+            "Backfill hourly_series from the historical CSVs and done runs "
+            "(REQ-HS-06). Idempotent; safe to re-run."
+        ),
+    )
+    parser.add_argument("--data-dir", default="data")
+    parser.add_argument(
+        "--start",
+        type=date.fromisoformat,
+        help="first Bogota day to replay (default: span of the year CSVs)",
+    )
+    parser.add_argument(
+        "--end",
+        type=date.fromisoformat,
+        help="last Bogota day to replay (default: span of the year CSVs)",
+    )
+    parser.add_argument(
+        "--database-url",
+        default=os.environ.get("DATABASE_URL"),
+        help="SQLAlchemy URL (default: $DATABASE_URL)",
+    )
+    args = parser.parse_args(argv)
+    if not args.database_url:
+        parser.error("DATABASE_URL is not set and --database-url was not passed")
+    engine = get_engine(args.database_url)
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        external = backfill_externals(
+            session, data_dir=args.data_dir, start=args.start, end=args.end
+        )
+        run_rows = backfill_run_rows(session)
+    print(f"hourly_series backfill ok: {external} external rows, {run_rows} run rows")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

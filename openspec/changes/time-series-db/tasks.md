@@ -48,7 +48,7 @@ Chain strategy: size-exception
 
 ## Phase 4: Backfill, Goldens, Closeout (U4)
 
-- [ ] 4.1 GREEN `python -m app.db.series` (REQ-HS-06): replay year CSVs + done runs; idempotent (SCN-HS-06-02)
-- [ ] 4.2 RED `tests/test_series_golden.py` (SCN-HS-04): raw 200.0 COP/kWh fails vs 200000.0; mpo 150000.0; run 3000→3000.0
-- [ ] 4.3 `tests/test_series_backfill.py` vs `tests/fixtures/xm_smoke/`: 24 rows/day, correct unit (SCN-HS-06-01)
-- [ ] 4.4 Final gates: ruff + full `uv run pytest -q`
+- [x] 4.1 GREEN `python -m app.db.series` (REQ-HS-06): replay year CSVs + done runs; idempotent (SCN-HS-06-02)
+- [x] 4.2 RED `tests/test_series_golden.py` (SCN-HS-04): raw 200.0 COP/kWh fails vs 200000.0; mpo 150000.0; run 3000→3000.0
+- [x] 4.3 `tests/test_series_backfill.py` vs `tests/fixtures/xm_smoke/`: 24 rows/day, correct unit (SCN-HS-06-01)
+- [x] 4.4 Final gates: ruff + full `uv run pytest -q`

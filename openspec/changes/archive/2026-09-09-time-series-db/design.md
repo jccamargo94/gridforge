@@ -22,7 +22,7 @@ Narrow `hourly_series` table (`ts`, `tenant_id` NULL=public, `series_key`, `valu
 `series_key` = chart-facing key; externals `source='xm'`; runs `source=run.id`. (level, grade)→key: ideal/settled→`ideal_settled`; ideal/provisional→`ideal_provisional`; preideal (either grade)→`preideal`. Serving ranks visible sources per (Bogota day, key): settled grade first, then `created_at` desc — mirrors `_SERIES_KEYS` + `list_done_public_dispatch_runs` recency. Scope = `tenant_id IS NULL OR tenant_id IN (user's tenants)` (REQ-HS-05). Accepted edge: run with unreadable `price_path` leaves no rows → cell `null` as today; only `*_run_id` differs (None).
 
 ### D4 — Run-row tenant attribution
-`visibility=="public"` → `tenant_id NULL`. Private: owner in exactly 1 tenant → that `tenant_id`; in 0 or >1 → write nothing — no public leak by construction (SCN-HS-03-02).
+`visibility=="public"` → `tenant_id NULL`. Private: owner in exactly 1 tenant → that `tenant_id`; owner in >1 tenants → every member tenant (B1, product decision `sdd/time-series-db/tenant-model`); in 0 tenants → write nothing — no public leak by construction (SCN-HS-03-02).
 
 ### D5 — `ts` convention
 `DateTime(timezone=True)`, stored UTC. Writers treat CSV naive datetimes as Bogota wall time (UTC−05:00, no DST) via `ZoneInfo("America/Bogota")`; readers bound Bogota day [D, D+1) in UTC for SQL, localize back for hourly arrays.
@@ -107,4 +107,4 @@ Additive: `alembic upgrade head` → backfill (idempotent) → deploy code; hist
 
 ## Open Questions
 
-- [ ] D4 skips writing when an owner belongs to >1 tenant; if multi-tenant attribution becomes a product need, add a `tenant_id` choice at run creation — table and helper unchanged.
+- [x] RESOLVED by B1 (product decision `sdd/time-series-db/tenant-model`): a multi-tenant owner's private-run rows are written under EVERY member tenant, not skipped. If tenant *choice* per run (rather than write-to-all) ever becomes a product need, add a `tenant_id` picker at run creation — table and helper unchanged.

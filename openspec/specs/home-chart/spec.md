@@ -2,11 +2,11 @@
 
 ## Proposito
 
-Home chart-first en `/`: serie diaria de precios (TX1, MPO XM, ideal liquidado/provisional, preideal) con drill-down a `/runs/[id]`. Backend `GET /chart/series` dado y congelado (9 claves por dia, `days` 1..90, default 30). Solo frontend (issue #90).
+Home chart-first en `/`: serie diaria de precios (TX1, MPO XM, ideal liquidado/provisional, preideal) con drill-down a `/runs/[id]`. El backend `GET /chart/series` ya no esta "dado y congelado": desde time-series-db sirve el contrato diario existente (9 claves por dia, `days` 1..90, default 30) derivado de la tabla `hourly_series` y expone valores horarios (REQ-HC-01, REQ-HC-02). Los requirements de frontend de este spec (issue #90) permanecen vigentes.
 
 ## No objetivos
 
-LMP, overlay horario, agregacion semanal, nueva vista de detalle, nav movil, acceso anonimo, cambio backend. `PriceSeriesChart` NO se reutiliza (dominio hora); solo sus patrones.
+LMP, overlay horario en la UI, agregacion semanal, nueva vista de detalle, nav movil, acceso anonimo. Ya no aplica el no-objetivo "cambio backend": time-series-db modifico `GET /chart/series` (REQ-HC-01, REQ-HC-02) manteniendo el contrato diario; el visual del Home no cambia en este cambio. `PriceSeriesChart` NO se reutiliza (dominio hora); solo sus patrones.
 
 ## Requirements
 
@@ -109,3 +109,35 @@ El sistema MUST resolver estas claves en ambos idiomas (es sin tildes): `home.ti
 - GIVEN `gridforge-lang=en`
 - WHEN abre `/`
 - THEN ve copy en ingles; con `es` ve copy sin tildes
+
+### Requirement: REQ-HC-01 Promedio diario derivado de hourly_series
+
+El backend `GET /chart/series` SHALL derivar el promedio diario de cada serie de precios desde la tabla `hourly_series` (unica fuente de verdad) en lugar de colapsar CSVs por request. El promedio diario de un (serie, dia) SHALL ser la media de las 24 filas horarias de la fuente ganadora del dia (mismo criterio de prioridad de run que hoy: ideal liquidado > provisional > preideal).
+
+#### Scenario: SCN-HC-01-01 Promedio diario consistente con lo horario
+
+- GIVEN 24 filas horarias publicas de `bolsa_tx1` para el dia D
+- WHEN se pide `GET /chart/series` para D
+- THEN el valor diario de `bolsa_tx1` es la media de las 24 filas
+
+#### Scenario: SCN-HC-01-02 Dia sin datos no inventa ceros
+
+- GIVEN dia D sin filas en `hourly_series` para una serie
+- WHEN se pide `GET /chart/series` para D
+- THEN esa clave queda `null` (gap), nunca cero
+
+### Requirement: REQ-HC-02 Valores horarios disponibles
+
+El backend SHALL exponer los valores horarios (hasta 24 por dia) de las series de precios servidas al Home, publicas y por tenant, manteniendo el contrato diario existente (claves, `days` 1..90). Valores horarios de otra fuente que no sea `hourly_series` SHALL NOT servirse.
+
+#### Scenario: SCN-HC-02-01 Respuesta horaria publica
+
+- GIVEN 24 filas publicas de `mpo_xm` para el dia D
+- WHEN se piden los valores horarios de D
+- THEN la respuesta expone 24 valores horarios mas el promedio diario
+
+#### Scenario: SCN-HC-02-02 Aislamiento por tenant
+
+- GIVEN filas publicas y filas del tenant A en `hourly_series`
+- WHEN un miembro de A pide los valores horarios
+- THEN recibe filas publicas y de A; ninguna fila de otro tenant

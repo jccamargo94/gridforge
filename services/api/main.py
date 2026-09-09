@@ -98,6 +98,8 @@ def _run_summary(run, case) -> dict:
         "started_at": run.started_at,
         "finished_at": run.finished_at,
         "error": run.error,
+        "visibility": run.visibility,
+        "input_grade": run.input_grade,
     }
 
 
@@ -182,9 +184,10 @@ def _nodal_summary(session, run_id: str) -> dict | None:
     }
 
 
-def _get_owned_run(session, run_id: str, user_id: str):
+def _get_authorized_run(session, run_id: str, user_id: str):
+    """Owner or any logged-in user when the run is public (spec section 7)."""
     run = queries.get_run(session, run_id)
-    if run is None or run.user_id != user_id:
+    if run is None or (run.user_id != user_id and run.visibility != "public"):
         raise HTTPException(status_code=404, detail="run not found")
     return run
 
@@ -293,7 +296,7 @@ def get_topology_network(user_id: str = Depends(get_current_user_id), session=De
 
 @app.get("/runs")
 def list_runs(user_id: str = Depends(get_current_user_id), session=Depends(get_session)):
-    runs = queries.list_runs_for_user(session, user_id)
+    runs = queries.list_visible_runs(session, user_id)
     return [
         {
             **_run_summary(r, queries.get_case(session, r.case_id)),
@@ -307,7 +310,7 @@ def list_runs(user_id: str = Depends(get_current_user_id), session=Depends(get_s
 def get_run_detail(
     run_id: str, user_id: str = Depends(get_current_user_id), session=Depends(get_session)
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     case = queries.get_case(session, run.case_id)
     metric_set = queries.get_metric_set(session, run.id)
     out = _run_summary(run, case)
@@ -359,7 +362,7 @@ def get_run_detail(
 def get_run_log(
     run_id: str, user_id: str = Depends(get_current_user_id), session=Depends(get_session)
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     if run.log_path is None or not get_storage(".").exists(run.log_path):
         raise HTTPException(status_code=404, detail="run has no log yet")
     with get_storage(".").open(run.log_path) as f:
@@ -418,7 +421,7 @@ def get_run_artifact(
     user_id: str = Depends(get_current_user_id),
     session=Depends(get_session),
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     path = _artifact_path(run, artifact)
     with get_storage(".").open(path) as f:
         df = pd.read_csv(f)
@@ -431,7 +434,7 @@ def download_price_comparison(
     user_id: str = Depends(get_current_user_id),
     session=Depends(get_session),
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     case = queries.get_case(session, run.case_id)
     df = _price_comparison_df(run, case)
     if df is None:
@@ -450,7 +453,7 @@ def download_run_artifact(
     user_id: str = Depends(get_current_user_id),
     session=Depends(get_session),
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     path = _artifact_path(run, artifact)
     return FileResponse(path)
 
@@ -468,7 +471,7 @@ def get_nodal_artifact(
     user_id: str = Depends(get_current_user_id),
     session=Depends(get_session),
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     nodal, path = _get_owned_nodal_result(session, run, artifact)
     if artifact == "summary":
         with get_storage(".").open(path) as f:
@@ -490,7 +493,7 @@ def download_nodal_artifact(
     user_id: str = Depends(get_current_user_id),
     session=Depends(get_session),
 ):
-    run = _get_owned_run(session, run_id, user_id)
+    run = _get_authorized_run(session, run_id, user_id)
     logical = _normalize_nodal_artifact(artifact)
     _, path = _get_owned_nodal_result(session, run, logical)
     return FileResponse(path)

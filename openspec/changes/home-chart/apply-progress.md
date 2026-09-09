@@ -12,6 +12,7 @@ Backend: untouched (`git status` shows only `frontend/` + `openspec/`).
 | 2 | `a39ce5003` | feat(home-chart): add getChartSeries fetcher and useChartSeries hook | 1.3 |
 | 3 | `16b349933` | feat(home-chart): add HomeChart with drill-down and home i18n keys | 2.1, 2.2, 3.1 (pulled forward) |
 | 4 | `32d16b0df` | feat(home-chart): wire Home page, sidebar entry, and manual-only runs filter | 3.2, 3.3, 3.4 (+ test hardening) |
+| 4b | `37c4270b1` | feat(home-chart): delete root redirect conflicting with Home route | 3.2 (deletion staged separately — explicit `git add` paths missed it) |
 
 ## Task status
 

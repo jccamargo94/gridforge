@@ -61,3 +61,14 @@ def load_dispo_come(data_dir: str, year: int) -> pd.DataFrame:
     storage = get_storage(data_dir)
     with storage.open(f"dispo_come/dispo_come_{year}.csv", "rb") as f:
         return pd.read_csv(f, parse_dates=["datetime"])
+
+
+def clear_loader_caches() -> None:
+    """Invalidate the year-level CSV caches.
+
+    The freshness tick rewrites the year CSVs in place; without clearing
+    these caches the same worker process would keep reading the stale file
+    (spec 2026-09-08-daily-runs, section 5.1).
+    """
+    for loader in (load_dispo, load_ofertas, load_demanda, load_precio_bolsa, load_dispo_come):
+        loader.cache_clear()

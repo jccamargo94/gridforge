@@ -3,6 +3,11 @@
 Revision ID: 0006
 Revises: 0005
 Create Date: 2026-09-08
+
+Downgrade caveat: reverting to 0005 re-adds the NOT NULL constraint on
+runs.user_id and drops run_plans. Clean up first — delete any system runs
+(user_id IS NULL) and all run_plans rows (FK to runs) — otherwise the
+batch alter raises IntegrityError on the NOT NULL re-add.
 """
 
 import sqlalchemy as sa

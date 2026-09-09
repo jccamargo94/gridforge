@@ -19,7 +19,7 @@ Backend: untouched (`git status` shows only `frontend/` + `openspec/`).
 - [x] 1.1 `isManualRun` in `frontend/lib/run-status.ts` (+ `run-status.test.ts`)
 - [x] 1.2 `ChartSeriesRow`/`RunVisibility`/`InputGrade` in `frontend/lib/types.ts`
   (required `visibility`/`input_grade` on `RunSummary`/`RunDetail`); fixtures updated
-  atomically in `runs-table.test.tsx` (+ 5 sibling fixtures required for `tsc`:
+  atomically in `runs-table.test.tsx` (+ 6 sibling fixtures required for `tsc`:
   `run-selector`, `run-comparison-table`, `types.test`, `runs/[id]/page.test`,
   `runs/[id]/nodal/page.test`, `(app)/nodal/page.test`)
 - [x] 1.3 `getChartSeries(days)` in `api-client.ts` + `use-chart-series.ts`
@@ -72,7 +72,7 @@ Approval tests: none — no refactoring tasks. Pure functions created: 3
 1. Task 3.1 (`home.*` keys) landed in unit-3 commit instead of unit 4: the
    chart RED tests assert translated strings, so GREEN was impossible without
    the keys. Same content, earlier commit — no design change.
-2. Fixture updates beyond `runs-table.test.tsx` (5 sibling files): required for
+2. Fixture updates beyond `runs-table.test.tsx` (6 sibling files): required for
    `tsc`/`next build` once `visibility`/`input_grade` became required. Minimal
    additions only (`visibility: "private"`, `input_grade: null`).
 3. Added `home.retry` i18n key ("Reintentar"/"Retry"): spec scenario requires an

@@ -81,3 +81,8 @@ def sweep_due(
     if day == last_sweep_date:
         return False, day
     return wall.time() >= _parse_hhmm(config.sweep_time), day
+
+
+def wall_time_reached(now: datetime, hhmm: str, tz_name: str) -> bool:
+    """True once the wall clock in `tz_name` reads hh:mm or later."""
+    return in_tz(now, tz_name).time() >= _parse_hhmm(hhmm)

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from app.data import loaders, xm_bulk
+from app.data import download, loaders, xm_bulk
 from app.data.heuristic.biddings import prune_estimated_rows
 from app.data.xm_bulk import (
     refresh_dema_come,
@@ -94,6 +94,18 @@ def refresh_tick(session, *, now, config, data_dir: str = "data", consult=None) 
         # Always invalidate: a mid-batch failure must not leave workers
         # reading stale loader frames until the next successful tick.
         loaders.clear_loader_caches()
+
+    # Per-date XM blob acquisition for the next Bogota day (post-final-review
+    # amendment): no other component downloads OFEI/PrId/iMAR/dCondIni*/dAGC
+    # by date, so without this the D-1 fresh lanes would sit at the input gate
+    # forever in a clean deployment. XM publishes the full D package by
+    # ~14:30 D-1, so the first freshness tick at/after DAILY_EARLIEST finds
+    # it; a late DESPACHO publication (rare, up to ~15:17) is retried by the
+    # next hourly tick while the plan gate keeps waiting honestly. Failures
+    # propagate to the caller (per-tick isolation) and heal on retry:
+    # ensure_data_for_date checks and downloads each blob file individually.
+    if timeutil.wall_time_reached(now, config.daily_earliest, config.scheduler_tz):
+        download.ensure_data_for_date(end_day, data_dir)
 
     month = plans.next_settlement_month(session, now=now, config=config, data_dir=data_dir)
     if month is None:

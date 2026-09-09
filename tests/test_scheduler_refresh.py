@@ -264,6 +264,99 @@ def test_pull_start_rollover_without_prev_year_file_keeps_window_edge(tmp_path):
     assert start == date(2024, 12, 25)
 
 
+def test_refresh_tick_prefetches_blobs_for_next_bogota_day_after_earliest(tmp_path, monkeypatch):
+    """F1: the freshness tick must download the per-date XM blobs of the next
+    Bogota day once the wall clock passes DAILY_EARLIEST — nothing else does,
+    and the D-1 input gate would block forever in a clean deployment without
+    it. 2024-04-20 20:05 UTC == 15:05 Bogota >= 15:00."""
+    session = _session()
+    fetched = []
+
+    def _fake_ensure(dispatch_date, data_dir="data"):
+        fetched.append((dispatch_date, data_dir))
+
+    monkeypatch.setattr("app.data.download.ensure_data_for_date", _fake_ensure)
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    now = datetime(2024, 4, 20, 20, 5, tzinfo=UTC)
+    consult = _FakeConsult(date(2024, 4, 14), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    assert fetched == [(date(2024, 4, 21), str(tmp_path))]
+
+
+def test_refresh_tick_skips_blob_prefetch_before_daily_earliest(tmp_path, monkeypatch):
+    """Before DAILY_EARLIEST the blob fetch must not fire: XM may not have
+    published the full D package yet, and re-downloading hourly before
+    ~14:30 D-1 would churn the portal. 2024-04-20 12:00 UTC == 07:00 Bogota."""
+    session = _session()
+    calls = []
+    monkeypatch.setattr(
+        "app.data.download.ensure_data_for_date",
+        lambda *a, **kw: calls.append(a),
+    )
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    now = datetime(2024, 4, 20, 12, 0, tzinfo=UTC)
+    consult = _FakeConsult(date(2024, 4, 14), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    assert calls == []
+
+
+def test_refresh_tick_blob_prefetch_honors_configured_daily_earliest(tmp_path, monkeypatch):
+    """The gate must come from config, not a hardcoded 15:00."""
+    session = _session()
+    fetched = []
+
+    def _fake_ensure(dispatch_date, data_dir="data"):
+        fetched.append((dispatch_date, data_dir))
+
+    monkeypatch.setattr("app.data.download.ensure_data_for_date", _fake_ensure)
+    config = SchedulerConfig(daily_earliest="20:00")
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    # 2024-04-21 00:30 UTC == 2024-04-20 19:30 Bogota < 20:00 -> no fetch
+    consult = _FakeConsult(date(2024, 4, 14), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session,
+        now=datetime(2024, 4, 21, 0, 30, tzinfo=UTC),
+        config=config,
+        data_dir=str(tmp_path),
+        consult=consult,
+    )
+    assert fetched == []
+    # 2024-04-21 01:30 UTC == 2024-04-20 20:30 Bogota >= 20:00 -> fetch for 04-21
+    refresh_mod.refresh_tick(
+        session,
+        now=datetime(2024, 4, 21, 1, 30, tzinfo=UTC),
+        config=config,
+        data_dir=str(tmp_path),
+        consult=consult,
+    )
+    assert fetched == [(date(2024, 4, 21), str(tmp_path))]
+
+
 def _boom(*args, **kwargs):
     raise RuntimeError("simulated refresh failure")
 

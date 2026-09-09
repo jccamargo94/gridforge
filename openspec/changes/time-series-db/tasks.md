@@ -52,3 +52,29 @@ Chain strategy: size-exception
 - [x] 4.2 RED `tests/test_series_golden.py` (SCN-HS-04): raw 200.0 COP/kWh fails vs 200000.0; mpo 150000.0; run 3000→3000.0
 - [x] 4.3 `tests/test_series_backfill.py` vs `tests/fixtures/xm_smoke/`: 24 rows/day, correct unit (SCN-HS-06-01)
 - [x] 4.4 Final gates: ruff + full `uv run pytest -q`
+
+## Apply status
+
+Applied 2026-09-09 on branch `fase8a-time-series-db` (off `develop` @ 38c4fe4e7).
+All 16 tasks complete; RED observed before every production change; full
+suite green at every commit (440 -> 467 tests).
+
+| Unit | Commits | Final suite |
+|---|---|---|
+| U1 models + migrations 0007/0008 | `6982aeb03` | 446 passed |
+| U2a shared upsert + external ingest | `5f06cfafa` | 451 passed |
+| U2b refresh_tick hook | `dd8ad48d4` | 451 passed |
+| U2c finish_run_ok hook | `bdf52d3ab` | 456 passed |
+| U3 chart serving + isolation | `1c48f3d2b` | 460 passed |
+| U4 backfill + goldens | `495cd04ef` | 467 passed |
+
+Final gates: `uv run pytest -q` 467 passed; `ruff check` and
+`ruff format --check` clean. Runtime harness (4.1):
+`python -m app.db.series --data-dir tests/fixtures/xm_smoke --start 2024-04-18
+--end 2024-04-18` run twice against a scratch SQLite DB -> 48 rows both
+times (24 bolsa_tx1 @ 200000.0 COP/MWh, 24 mpo_xm @ 150000.0), idempotent.
+B1 applied (multi-tenant owner -> rows under EVERY member tenant; design D4
+superseded per tasks.md 2.5). `finish_nodal_run_ok` untouched (D6).
+Rollback: downgrade 0008 then 0007; revert writer/serving hooks; CSVs remain
+the source of truth. One PR vs `develop`, maintainer-approved `size:exception`
+(forecast 1400-1800 lines honored).

@@ -5,7 +5,7 @@ vi.mock("./supabase", () => ({
 }));
 
 import { supabase } from "./supabase";
-import { createRun, createScenario, downloadNodalArtifact, downloadRunArtifact, getRunDispatch, getRunLog, getRunMarginalPlants, getRunNodalArtifact, listRuns } from "./api-client";
+import { createRun, createScenario, downloadNodalArtifact, downloadRunArtifact, getChartSeries, getRunDispatch, getRunLog, getRunMarginalPlants, getRunNodalArtifact, listRuns } from "./api-client";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -180,6 +180,36 @@ describe("api-client", () => {
     const log = await getRunLog("run-1");
 
     expect(log).toBeNull();
+  });
+});
+
+describe("getChartSeries", () => {
+  it("fetches /chart/series with the requested days window", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => [{ date: "2024-04-18" }],
+    });
+
+    const rows = await getChartSeries(7);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/chart/series?days=7"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer tok-123" }),
+      })
+    );
+    expect(rows).toEqual([{ date: "2024-04-18" }]);
+  });
+
+  it("requests the default 30-day window", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => [] });
+
+    await getChartSeries(30);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/chart/series?days=30"),
+      expect.anything()
+    );
   });
 });
 

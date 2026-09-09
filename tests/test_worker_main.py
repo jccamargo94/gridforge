@@ -306,9 +306,12 @@ def test_main_iteration_runs_plan_tick_and_manual_lane(monkeypatch):
 
     config = SchedulerConfig(daily_enabled=True)
     state = main_iteration(session, now=NOW, config=config)
-    # first pass: every tick deadline starts at 0.0 -> plan + refresh fire;
+    # first pass: every tick deadline starts at 0.0 -> refresh + plan fire.
+    # REFRESH RUNS BEFORE PLAN (post-final-review amendment): a plan claim in
+    # the same pass must observe the series rows/blobs fetched by that pass's
+    # refresh, otherwise a clean deployment would gate on yesterday's files.
     # sweep: 21:00 UTC == 16:00 Bogota >= 05:30 -> fires; manual lane runs once
-    assert calls == ["plan", "refresh", "sweep", "manual"]
+    assert calls == ["refresh", "plan", "sweep", "manual"]
     assert state.last_sweep_date == date(2026, 9, 8)
     assert state.plan_next > 0
 

@@ -44,6 +44,16 @@ def main_iteration(
     config = config or SchedulerConfig.from_env()
 
     if config.daily_enabled:
+        # Refresh BEFORE plan (post-final-review amendment): a plan claim in
+        # the same pass must observe the year-series rows and per-date blobs
+        # fetched by that pass's freshness tick; sweep stays after plan, and
+        # the manual lane stays last, outside the daily block.
+        if time.monotonic() >= state.fresh_next:
+            state.fresh_next = time.monotonic() + 60 * config.data_refresh_interval_minutes
+            try:
+                refresh.refresh_tick(session, now=now, config=config, data_dir=data_dir)
+            except Exception:
+                traceback.print_exc()
         if time.monotonic() >= state.plan_next:
             state.plan_next = time.monotonic() + config.plan_tick_seconds
             try:
@@ -54,12 +64,6 @@ def main_iteration(
                     data_dir=data_dir,
                     results_root=results_root,
                 )
-            except Exception:
-                traceback.print_exc()
-        if time.monotonic() >= state.fresh_next:
-            state.fresh_next = time.monotonic() + 60 * config.data_refresh_interval_minutes
-            try:
-                refresh.refresh_tick(session, now=now, config=config, data_dir=data_dir)
             except Exception:
                 traceback.print_exc()
         fire, day = timeutil.sweep_due(now, config, state.last_sweep_date)

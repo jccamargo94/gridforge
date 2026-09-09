@@ -32,10 +32,10 @@ Chain strategy: size-exception
 
 ## Phase 2: Ingest Helper + Writers (U2)
 
-- [ ] 2.1 RED `tests/test_db_series.py`: upsert idempotent (SCN-HS-01-02); per-row conflict target public vs tenant (D2); B3 skip+log on unreadable source
-- [ ] 2.2 GREEN `app/db/series.py`: `upsert_hourly_rows`, one statement/commit per batch
-- [ ] 2.3 RED `tests/test_scheduler_refresh.py`: tick writes 24 public rows/series (SCN-HS-02-01/02)
-- [ ] 2.4 GREEN: hook `ingest_external_window` into `refresh_tick` after ensure_data_for_date (refresh.py:107-108)
+- [x] 2.1 RED `tests/test_db_series.py`: upsert idempotent (SCN-HS-01-02); per-row conflict target public vs tenant (D2); B3 skip+log on unreadable source
+- [x] 2.2 GREEN `app/db/series.py`: `upsert_hourly_rows`, one statement/commit per batch
+- [x] 2.3 RED `tests/test_scheduler_refresh.py`: tick writes 24 public rows/series (SCN-HS-02-01/02)
+- [x] 2.4 GREEN: hook `ingest_external_window` into `refresh_tick` after ensure_data_for_date (refresh.py:107-108)
 - [ ] 2.5 RED: `finish_run_ok` (queries.py:88): 24 ideal rows source=run_id; public→NULL; multi-tenant owner→each tenant (B1); zero-membership→none (SCN-HS-03-02); B3: bad price_path/absent CSVs never raise (executor.py:107-112)
 - [ ] 2.6 GREEN: `ingest_run_price_rows` hook before queries.py:127 commit; membership keyed on owner user_id (JWT sub); `finish_nodal_run_ok` untouched (D6)
 

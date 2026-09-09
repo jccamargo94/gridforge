@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
@@ -355,6 +356,89 @@ def test_refresh_tick_blob_prefetch_honors_configured_daily_earliest(tmp_path, m
         consult=consult,
     )
     assert fetched == [(date(2024, 4, 21), str(tmp_path))]
+
+
+def test_refresh_tick_ingests_public_hourly_external_rows(tmp_path, monkeypatch):
+    """SCN-HS-02-01/02: after DAILY_EARLIEST the tick upserts 24 public
+    hourly rows per external series for each published Bogota day (COP/MWh
+    scale — bolsa raw COP/kWh x1e3, mpo COP/MWh direct); a re-tick keeps the
+    counts unchanged (no duplicates, no holes)."""
+    from app.db.models import HourlySeries
+
+    session = _session()
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-20", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    # per-date iMAR blob for the ensured Bogota end day (04-21)
+    blob_dir = tmp_path / "2024-04-21"
+    blob_dir.mkdir(parents=True)
+    mpo = '","'.join(["150000.00"] * 24)
+    (blob_dir / "iMAR0421.txt").write_text(f'"MPO","{mpo}"\n')
+
+    monkeypatch.setattr("app.data.download.ensure_data_for_date", lambda *a, **kw: None)
+    # 2024-04-20 20:05 UTC == 15:05 Bogota >= DAILY_EARLIEST 15:00
+    now = datetime(2024, 4, 20, 20, 5, tzinfo=UTC)
+    consult = _FakeConsult(date(2024, 4, 14), date(2024, 4, 21))
+
+    def _bogota_date(ts):
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        return ts.astimezone(ZoneInfo("America/Bogota")).date()
+
+    def _counts_and_values():
+        rows = list(session.scalars(select(HourlySeries)))
+        assert all(r.tenant_id is None for r in rows)
+        counts: dict = {}
+        values: dict = {}
+        for r in rows:
+            pair = (r.series_key, _bogota_date(r.ts))
+            counts[pair] = counts.get(pair, 0) + 1
+            values[pair] = r.value
+        return counts, values
+
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    counts, values = _counts_and_values()
+    # merged window 04-14..04-21: every published day has a full bolsa day
+    for day in [date(2024, 4, 14) + timedelta(days=i) for i in range(8)]:
+        assert counts[("bolsa_tx1", day)] == 24
+    # SCN-HS-04-01: raw 300 COP/kWh stored as 300000.0 COP/MWh
+    assert values[("bolsa_tx1", date(2024, 4, 21))] == 300000.0
+    # the ensured end-day iMAR blob yields its 24 public mpo rows
+    assert counts[("mpo_xm", date(2024, 4, 21))] == 24
+    assert values[("mpo_xm", date(2024, 4, 21))] == 150000.0
+
+    # SCN-HS-02-02: a re-tick over the same period changes nothing
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    counts_again, _ = _counts_and_values()
+    assert counts_again == counts
+
+
+def test_refresh_tick_ingest_skips_days_without_sources(tmp_path, monkeypatch):
+    """B3: ticks with no per-date iMAR blobs must not raise or invent rows —
+    the bolsa year CSV created by the merge still ingests, missing mpo days
+    stay gaps."""
+    from app.db.models import HourlySeries
+
+    session = _session()
+    monkeypatch.setattr("app.data.download.ensure_data_for_date", lambda *a, **kw: None)
+    now = datetime(2024, 4, 20, 20, 5, tzinfo=UTC)  # >= DAILY_EARLIEST
+    consult = _FakeConsult(date(2024, 4, 14), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    rows = list(session.scalars(select(HourlySeries)))
+    assert rows, "tick must ingest bolsa rows from the freshly merged CSV"
+    assert all(r.tenant_id is None for r in rows)
+    assert all(r.value == 300000.0 for r in rows if r.series_key == "bolsa_tx1")
 
 
 def _boom(*args, **kwargs):

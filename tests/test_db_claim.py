@@ -74,6 +74,21 @@ def test_claim_picks_oldest_pending_run_first():
     assert claimed.id == older.id
 
 
+def test_claim_manual_lane_never_returns_system_runs():
+    """F3: claim_next_pending_run is the MANUAL lane — system runs (user_id
+    NULL, created by plans) are claimed by id via claim_run_by_id right after
+    creation and must never be picked up here."""
+    session = _session()
+    user_run = _make_pending_run(session, user_id="user-x")
+    _make_pending_run(session, user_id=None)  # system run, older created_at
+
+    first = claim_next_pending_run(session)
+    second = claim_next_pending_run(session)
+
+    assert first is not None and first.id == user_run.id  # NULL run never first
+    assert second is None  # and never returned at all: lane is now empty
+
+
 def test_claim_run_by_id_claims_pending_run():
     session = _session()
     run = _make_pending_run(session)

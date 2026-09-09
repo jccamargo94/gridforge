@@ -25,7 +25,18 @@ def _locked(stmt, session: Session):
 
 
 def claim_next_pending_run(session: Session) -> Run | None:
-    stmt = select(Run).where(Run.status == "pending").order_by(Run.created_at).limit(1)
+    """Claim the oldest pending USER run (manual lane).
+
+    System runs have `user_id IS NULL` (created by the scheduler) and are
+    claimed by id via `claim_run_by_id` right after creation — this lane must
+    never pick them up (post-final-review amendment, F3).
+    """
+    stmt = (
+        select(Run)
+        .where(Run.status == "pending", Run.user_id.is_not(None))
+        .order_by(Run.created_at)
+        .limit(1)
+    )
     run = session.scalars(_locked(stmt, session)).first()
     if run is None:
         return None

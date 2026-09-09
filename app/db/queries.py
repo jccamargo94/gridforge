@@ -326,3 +326,18 @@ def mark_plan_skipped(session: Session, plan: RunPlan, *, reason: str) -> None:
     plan.finished_at = datetime.now(timezone.utc)
     session.add(plan)
     session.commit()
+
+
+def list_done_public_dispatch_runs(session: Session) -> list[tuple[Run, Case]]:
+    """Public done runs of the dispatch levels the chart series consumes."""
+    stmt = (
+        select(Run, Case)
+        .join(Case, Run.case_id == Case.id)
+        .where(
+            Run.visibility == "public",
+            Run.status == "done",
+            Case.level.in_(["preideal", "ideal"]),
+        )
+        .order_by(Run.created_at.desc())
+    )
+    return list(session.execute(stmt))

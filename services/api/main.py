@@ -4,7 +4,7 @@ from datetime import date
 
 import httpx
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ValidationError
@@ -17,6 +17,7 @@ from app.nodal.network.schemas import NodalNetwork
 from app.schemas import BessScenario, DispatchLevel
 from app.storage import get_storage
 from services.api.auth import get_current_user_id
+from services.api.chart import build_chart_series
 
 TOPOLOGY_DATASET = "topology_network"
 TOPOLOGY_PARTITION = "colombia"
@@ -304,6 +305,20 @@ def list_runs(user_id: str = Depends(get_current_user_id), session=Depends(get_s
         }
         for r in runs
     ]
+
+
+@app.get("/chart/series")
+def get_chart_series(
+    days: int = Query(30, ge=1, le=90),
+    user_id: str = Depends(get_current_user_id),
+    session=Depends(get_session),
+):
+    """Daily COP/MWh series for the Home chart (spec section 7.1)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    today = datetime.now(ZoneInfo("America/Bogota")).date()
+    return build_chart_series(session, days=days, today=today, data_dir="data")
 
 
 @app.get("/runs/{run_id}")

@@ -23,6 +23,12 @@ from app.scheduler.plans import KIND_INPUT_GRADE, KIND_LEVEL
 from app.schemas import BessScenario, DispatchCase, DispatchLevel
 from app.storage import get_storage
 
+# Settled runs stamp metric_set.reference at finish (plan Note #2):
+# preideal always evaluates against iMAR, ideal against bolsa TX1. LMP
+# metrics live in nodal_results.metrics (JSON), which has no reference
+# column. Provisional runs keep reference NULL until their reeval row runs.
+KIND_REFERENCE = {"preideal_settled": "iMAR", "ideal_settled": "bolsa_tx1"}
+
 
 def _build_case(session, case_row) -> DispatchCase:
     scenario = None
@@ -43,9 +49,18 @@ def _build_case(session, case_row) -> DispatchCase:
 
 
 def execute_run(
-    session, run, *, data_dir: str = "data", results_root: str = "data/results"
+    session,
+    run,
+    *,
+    reference: str | None = None,
+    data_dir: str = "data",
+    results_root: str = "data/results",
 ) -> None:
-    """Solve one claimed run to completion; never raises."""
+    """Solve one claimed run to completion; never raises.
+
+    `reference` stamps the finish-time metric_set (settled runs; plan Note
+    #2). Manual/worker runs and provisionals pass None and stay unstamped.
+    """
     out_dir = f"{results_root}/{run.id}"
     log_path = f"{out_dir}/run.log"
 
@@ -84,7 +99,7 @@ def execute_run(
             if result.nodal is not None:
                 queries.finish_nodal_run_ok(session, run, result, out_dir=out_dir)
             else:
-                queries.finish_run_ok(session, run, result, out_dir=out_dir)
+                queries.finish_run_ok(session, run, result, out_dir=out_dir, reference=reference)
         else:
             queries.finish_run_failed(
                 session, run, result.error or "unknown error", log_path=log_path
@@ -138,7 +153,13 @@ def execute_plan(
         )
         return
 
-    execute_run(session, claimed, data_dir=data_dir, results_root=results_root)
+    execute_run(
+        session,
+        claimed,
+        reference=KIND_REFERENCE.get(plan.kind),
+        data_dir=data_dir,
+        results_root=results_root,
+    )
 
     if claimed.status == "done":
         queries.mark_plan_done(session, plan, run_id=claimed.id)

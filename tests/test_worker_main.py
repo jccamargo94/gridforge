@@ -11,7 +11,7 @@ from app.db import queries
 from app.db.models import Base, Run
 from app.scheduler.config import SchedulerConfig
 from app.schemas import DispatchCase, DispatchLevel, RunResult
-from services.worker.main import main_iteration, process_once
+from services.worker.main import main, main_iteration, process_once
 
 DD = str(Path(__file__).parent / "fixtures" / "xm_smoke")
 FECHA = date(2024, 4, 18)
@@ -269,6 +269,36 @@ def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, m
 
 
 NOW = datetime(2026, 9, 8, 21, 0, tzinfo=timezone.utc)
+
+
+def test_main_reconciles_stale_running_once_before_loop(monkeypatch):
+    """F2: the boot path runs the stale-running reconcile exactly once, before
+    the polling loop starts."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr("services.worker.main.get_engine", lambda: engine)
+    reconciled = []
+    monkeypatch.setattr(
+        "services.worker.main.reconcile_stale_running",
+        lambda *a, **kw: reconciled.append((a, kw)),
+    )
+    monkeypatch.setattr("services.worker.main.main_iteration", lambda session, state: state)
+    slept = []
+
+    def _stop_sleeping(*a, **kw):
+        slept.append(a)
+        raise SystemExit(0)  # unwind the infinite polling loop after one pass
+
+    monkeypatch.setattr("services.worker.main.time.sleep", _stop_sleeping)
+
+    with pytest.raises(SystemExit):
+        main()
+
+    assert len(reconciled) == 1
+    # called with a session (positional) and an injected aware `now` keyword
+    _session_arg, kwargs = reconciled[0]
+    assert "now" in kwargs and kwargs["now"].tzinfo is not None
+    assert len(slept) == 1
 
 
 def test_main_iteration_disabled_runs_only_manual_lane(monkeypatch):

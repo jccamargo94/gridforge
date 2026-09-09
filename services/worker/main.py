@@ -3,7 +3,7 @@ import traceback
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
-from app.db.claim import claim_next_pending_run
+from app.db.claim import claim_next_pending_run, reconcile_stale_running
 from app.db.session import get_engine, get_sessionmaker
 from app.scheduler import plans, refresh, tick, timeutil
 from app.scheduler.config import SchedulerConfig
@@ -84,6 +84,10 @@ def main_iteration(
 def main() -> None:
     engine = get_engine()
     session_factory = get_sessionmaker(engine)
+    # F2: rows left `running` by a crash are reconciled once at boot (stale
+    # plans become retry-scheduled failures, stale runs terminal failures).
+    with session_factory() as session:
+        reconcile_stale_running(session, now=datetime.now(timezone.utc))
     state = WorkerState()
     while True:
         with session_factory() as session:

@@ -10,7 +10,11 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db import queries
 from app.db.models import Run, RunPlan
+
+PLAN_STALE_ERROR = "worker reiniciado con plan en running (stale)"
+RUN_STALE_ERROR = "run interrumpido por reinicio del worker (stale)"
 
 
 def _locked(stmt, session: Session):
@@ -60,3 +64,34 @@ def claim_run_plan_by_id(session: Session, plan_id: str) -> RunPlan | None:
     plan.attempts += 1
     session.commit()
     return plan
+
+
+def reconcile_stale_running(session: Session, *, now: datetime) -> tuple[int, int]:
+    """Reconcile rows left `running` by a crashed worker; call ONCE at boot.
+
+    Single-process-worker assumption: at boot no live worker owns these rows,
+    so marking them failed is not a steal. Multi-worker deployments need an
+    age-based reaper instead (out of scope).
+
+    Plans: every stale `running` plan becomes `failed` with the stale marker
+    and retry scheduled at `now`, mirroring `queries.mark_plan_failed`'s
+    mark-vs-retry semantics (attempts were already incremented at claim).
+    Rows below the attempt cap are claimable again — the next plan tick
+    decides by window (open -> retry, expired -> honest skip); rows at/above
+    the cap are never listed again, so they stay terminal in effect.
+    Runs: every stale `running` run becomes `failed` with the interruption
+    marker and `finished_at = now`.
+
+    Returns (plans_reconciled, runs_reconciled).
+    """
+    plans = list(session.scalars(select(RunPlan).where(RunPlan.status == "running")))
+    for plan in plans:
+        queries.mark_plan_failed(session, plan, error=PLAN_STALE_ERROR, retry_at=now)
+    runs = list(session.scalars(select(Run).where(Run.status == "running")))
+    for run in runs:
+        run.status = "failed"
+        run.error = RUN_STALE_ERROR
+        run.finished_at = now
+        session.add(run)
+    session.commit()
+    return len(plans), len(runs)

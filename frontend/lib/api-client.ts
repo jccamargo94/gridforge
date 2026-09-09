@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
+import type { ChartSeriesRow, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -30,6 +30,10 @@ export function listRuns(): Promise<RunSummary[]> {
 
 export function getRun(id: string): Promise<RunDetail> {
   return request<RunDetail>(`/runs/${id}`);
+}
+
+export function getChartSeries(days: number): Promise<ChartSeriesRow[]> {
+  return request<ChartSeriesRow[]>(`/chart/series?days=${days}`);
 }
 
 export function createRun(body: CreateRunRequest): Promise<{ run_id: string; status: string }> {

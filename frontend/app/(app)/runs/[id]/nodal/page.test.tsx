@@ -21,7 +21,8 @@ vi.mock("@/lib/auth-context", () => ({
 
 const NODAL_RUN: RunDetail = {
   run_id: "run-1", status: "done", dispatch_date: "2024-04-18", level: "lmp",
-  scenario_id: null, created_at: "2024-04-18T12:00:00Z", started_at: null,
+  scenario_id: null, visibility: "private", input_grade: null,
+  created_at: "2024-04-18T12:00:00Z", started_at: null,
   finished_at: null, error: null,
   metrics: null,
   artifacts: { dispatch: false, prices: false, bess: false, marginal_plants: false },

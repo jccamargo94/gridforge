@@ -1,5 +1,19 @@
 export type RunStatus = "pending" | "running" | "done" | "failed";
 export type DispatchLevel = "preideal" | "ideal" | "lmp";
+export type RunVisibility = "private" | "public";
+export type InputGrade = "settled" | "provisional" | null;
+
+export interface ChartSeriesRow {
+  date: string;
+  bolsa_tx1: number | null;
+  mpo_xm: number | null;
+  ideal_settled: number | null;
+  ideal_settled_run_id: string | null;
+  ideal_provisional: number | null;
+  ideal_provisional_run_id: string | null;
+  preideal: number | null;
+  preideal_run_id: string | null;
+}
 
 export interface RunSummary {
   run_id: string;
@@ -7,6 +21,8 @@ export interface RunSummary {
   dispatch_date: string;
   level: DispatchLevel;
   scenario_id: string | null;
+  visibility: RunVisibility;
+  input_grade: InputGrade;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

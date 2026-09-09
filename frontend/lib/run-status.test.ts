@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTerminalStatus, statusLabel, statusBadgeVariant } from "./run-status";
+import { isManualRun, isTerminalStatus, statusLabel, statusBadgeVariant } from "./run-status";
 
 describe("isTerminalStatus", () => {
   it("is false for pending and running", () => {
@@ -10,6 +10,21 @@ describe("isTerminalStatus", () => {
   it("is true for done and failed", () => {
     expect(isTerminalStatus("done")).toBe(true);
     expect(isTerminalStatus("failed")).toBe(true);
+  });
+});
+
+describe("isManualRun", () => {
+  it("is false for public runs (daily system lane)", () => {
+    expect(isManualRun({ visibility: "public" })).toBe(false);
+  });
+
+  it("is true for private runs (manual lane)", () => {
+    expect(isManualRun({ visibility: "private" })).toBe(true);
+  });
+
+  it("is true when visibility is missing (stale fixture)", () => {
+    expect(isManualRun({})).toBe(true);
+    expect(isManualRun({ visibility: undefined })).toBe(true);
   });
 });
 

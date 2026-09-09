@@ -1,0 +1,40 @@
+schema: spec-driven
+
+context: |
+  Stack: Python 3.12 + uv, FastAPI (services/api) + polling worker (app/db/claim.py), Next.js 16 + React 19 + recharts (frontend/), Pyomo/CBC.
+  Tests: uv run pytest -q (backend) + pnpm test / vitest jsdom (frontend/). Lint: ruff E/F/I len 100 (blocking); eslint (frontend). Types: ty manual-only; tsc via next build.
+  Rules: no commit to develop (fase<N><letra>-<nombre> -> PR to develop); English conventional PR title + ## Summary/## Test plan; no AI co-authorship.
+  Specs/issues in Spanish, plans/code in English. Fixtures anchored with Path(__file__).parent. Storage via app.storage; solver default cbc.
+  Active change: issue #90 Home chart-first frontend, drill-down by *_run_id; backend GET /chart/series exists on develop @ 03b63fbc3.
+
+strict_tdd: true
+
+testing:
+  backend: "uv run pytest -q"
+  frontend: "pnpm test"
+  coverage: null
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Specs/issues in Spanish per repo convention; plans/code in English
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns (Storage abstraction, solver cbc, Path(__file__).parent fixtures)
+      - Never commit to develop; branch fase<N><letra>-<nombre>; English conventional-commit PR title; no AI co-authorship lines
+    tdd: true
+    test_command: "uv run pytest -q"
+  verify:
+    test_command: "uv run pytest -q"
+    build_command: "pnpm --dir frontend build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

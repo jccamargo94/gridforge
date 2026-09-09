@@ -10,7 +10,8 @@ describe("nodal types", () => {
   it("shapes RunSummary with nodal summary", () => {
     const summary: RunSummary = {
       run_id: "r1", status: "done", dispatch_date: "2024-04-18", level: "lmp",
-      scenario_id: null, created_at: "2024-04-18T00:00:00Z", started_at: null,
+      scenario_id: null, visibility: "private", input_grade: null,
+      created_at: "2024-04-18T00:00:00Z", started_at: null,
       finished_at: null, error: null,
       nodal: { network_name: "three_zone", zones: 3, generators: 3, branches: 2 },
     };

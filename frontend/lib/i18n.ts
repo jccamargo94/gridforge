@@ -2,6 +2,7 @@ export type Lang = "es" | "en";
 
 const dict: Record<Lang, Record<string, string>> = {
   es: {
+    "sidebar.home": "Inicio",
     "sidebar.runs": "Ejecuciones",
     "sidebar.scenarios": "Escenarios",
     "sidebar.compare": "Comparar",
@@ -51,6 +52,19 @@ const dict: Record<Lang, Record<string, string>> = {
     "runs.loadError": "No se pudieron cargar las ejecuciones.",
     "runs.empty": "Sin ejecuciones todavia.",
     "runs.emptyHint": "Crea tu primera ejecucion usando el formulario de arriba.",
+
+    "home.title": "Precios del mercado",
+    "home.subtitle": "Bolsa real, MPO de XM y simulaciones del modelo por dia",
+    "home.tx1": "Bolsa real (TX1)",
+    "home.mpo": "MPO XM (iMAR)",
+    "home.idealSettled": "Ideal liquidado",
+    "home.idealProv": "Ideal provisional",
+    "home.preideal": "Preideal",
+    "home.loading": "Cargando serie...",
+    "home.empty": "Sin datos de serie todavia.",
+    "home.error": "No se pudo cargar la serie.",
+    "home.retry": "Reintentar",
+    "home.tx1Lag": "TX1 publica con 2-4 dias de retraso.",
 
     "runDetail.loading": "Cargando detalles...",
     "runDetail.dispatchChart": "Despacho por generador",
@@ -283,6 +297,7 @@ const dict: Record<Lang, Record<string, string>> = {
   },
 
   en: {
+    "sidebar.home": "Home",
     "sidebar.runs": "Runs",
     "sidebar.scenarios": "Scenarios",
     "sidebar.compare": "Compare",
@@ -332,6 +347,19 @@ const dict: Record<Lang, Record<string, string>> = {
     "runs.loadError": "Could not load executions.",
     "runs.empty": "No executions yet.",
     "runs.emptyHint": "Create your first dispatch run using the form above.",
+
+    "home.title": "Market prices",
+    "home.subtitle": "Real bolsa, XM MPO and model simulations per day",
+    "home.tx1": "Real bolsa (TX1)",
+    "home.mpo": "XM MPO (iMAR)",
+    "home.idealSettled": "Settled ideal",
+    "home.idealProv": "Provisional ideal",
+    "home.preideal": "Preideal",
+    "home.loading": "Loading series...",
+    "home.empty": "No series data yet.",
+    "home.error": "Could not load the series.",
+    "home.retry": "Retry",
+    "home.tx1Lag": "TX1 publishes with a 2-4 day lag.",
 
     "runDetail.loading": "Loading run details...",
     "runDetail.dispatchChart": "Dispatch by Generator",

@@ -11,6 +11,8 @@ function makeRun(overrides: Partial<RunDetail>): RunDetail {
     dispatch_date: "2024-04-18",
     level: "preideal",
     scenario_id: null,
+    visibility: "private",
+    input_grade: null,
     created_at: "2024-04-18T05:00:00Z",
     started_at: null,
     finished_at: null,

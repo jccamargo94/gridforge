@@ -42,6 +42,23 @@ describe("AppSidebar", () => {
     expect(signOut).toHaveBeenCalled();
   });
 
+  it("shows a Home nav item linking to /", () => {
+    pathname.current = "/runs";
+    renderSidebar();
+    expect(screen.getByRole("link", { name: /inicio/i })).toHaveAttribute("href", "/");
+  });
+
+  it("marks Home active only on the exact / route", () => {
+    pathname.current = "/";
+    const { unmount } = renderSidebar();
+    expect(screen.getByRole("link", { name: /inicio/i })).toHaveClass("text-amber-400");
+    unmount();
+
+    pathname.current = "/runs";
+    renderSidebar();
+    expect(screen.getByRole("link", { name: /inicio/i })).not.toHaveClass("text-amber-400");
+  });
+
   it("shows a Nodal nav item linking to /nodal", () => {
     render(
       <ThemeProvider><I18nProvider><AppSidebar /></I18nProvider></ThemeProvider>,

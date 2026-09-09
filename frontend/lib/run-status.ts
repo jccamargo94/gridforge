@@ -1,9 +1,13 @@
 import { t as translate } from "./i18n";
 import type { Lang } from "./i18n";
-import type { RunStatus } from "./types";
+import type { RunStatus, RunVisibility } from "./types";
 
 export function isTerminalStatus(status: RunStatus): boolean {
   return status === "done" || status === "failed";
+}
+
+export function isManualRun(run: { visibility?: RunVisibility }): boolean {
+  return run.visibility !== "public";
 }
 
 export function statusLabel(status: RunStatus, lang: Lang = "es"): string {

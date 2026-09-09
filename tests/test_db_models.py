@@ -1,12 +1,22 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import queries
-from app.db.models import Base, Case, InputDataset, MetricSet, Run, Scenario
+from app.db.models import (
+    Base,
+    Case,
+    HourlySeries,
+    InputDataset,
+    MetricSet,
+    Run,
+    Scenario,
+    Tenant,
+    TenantMember,
+)
 
 
 def _memory_engine():
@@ -168,3 +178,120 @@ def test_nodal_result_round_trip():
     assert fetched.metrics["total_cost"] == 100.0
     assert fetched.network["name"] == "three_zone"
     assert fetched.summary_path == "data/results/x/summary.json"
+
+
+def test_tenant_round_trip():
+    engine = _memory_engine()
+    with Session(engine) as session:
+        tenant = Tenant(name="acme-energia")
+        session.add(tenant)
+        session.commit()
+        session.refresh(tenant)
+        assert tenant.id
+        assert tenant.created_at is not None
+
+        fetched = session.get(Tenant, tenant.id)
+        assert fetched.name == "acme-energia"
+
+
+def test_tenant_member_round_trip_and_user_lookup():
+    engine = _memory_engine()
+    with Session(engine) as session:
+        tenant = Tenant(name="acme-energia")
+        session.add(tenant)
+        session.flush()
+        member = TenantMember(tenant_id=tenant.id, user_id="user-1")
+        session.add(member)
+        session.commit()
+
+        stmt = select(TenantMember).where(TenantMember.user_id == "user-1")
+        rows = list(session.scalars(stmt))
+        assert len(rows) == 1
+        assert rows[0].tenant_id == tenant.id
+        assert rows[0].user_id == "user-1"
+
+
+def test_tenant_member_composite_pk_rejects_duplicate_user():
+    engine = _memory_engine()
+    with Session(engine) as session:
+        tenant = Tenant(name="acme-energia")
+        session.add(tenant)
+        session.flush()
+        session.add(TenantMember(tenant_id=tenant.id, user_id="user-1"))
+        session.commit()
+
+        session.add(TenantMember(tenant_id=tenant.id, user_id="user-1"))
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
+def test_hourly_series_round_trip_public_and_tenant():
+    engine = _memory_engine()
+    with Session(engine) as session:
+        tenant = Tenant(name="acme-energia")
+        session.add(tenant)
+        session.flush()
+        ts = datetime(2024, 4, 18, 5, 0, tzinfo=timezone.utc)
+        public = HourlySeries(
+            ts=ts, tenant_id=None, series_key="bolsa_tx1", value=200000.0, source="xm"
+        )
+        scoped = HourlySeries(
+            ts=ts, tenant_id=tenant.id, series_key="bolsa_tx1", value=200000.0, source="xm"
+        )
+        session.add_all([public, scoped])
+        session.commit()
+
+        fetched_public = session.get(HourlySeries, public.id)
+        assert fetched_public.tenant_id is None
+        assert fetched_public.series_key == "bolsa_tx1"
+        assert fetched_public.value == 200000.0
+        assert fetched_public.source == "xm"
+
+        fetched_scoped = session.get(HourlySeries, scoped.id)
+        assert fetched_scoped.tenant_id == tenant.id
+
+
+def test_hourly_series_partial_unique_indexes_dedupe_by_scope():
+    """SCN-HS-01-02/REQ-HS-01: one unique key per scope — public (tenant NULL)
+    and per tenant — over (series_key, ts, source)."""
+    engine = _memory_engine()
+    with Session(engine) as session:
+        tenant = Tenant(name="acme-energia")
+        session.add(tenant)
+        session.flush()
+        ts = datetime(2024, 4, 18, 5, 0, tzinfo=timezone.utc)
+
+        session.add(
+            HourlySeries(ts=ts, tenant_id=None, series_key="bolsa_tx1", value=1.0, source="xm")
+        )
+        session.commit()
+        # duplicate public key: second insert must violate the partial unique
+        session.add(
+            HourlySeries(ts=ts, tenant_id=None, series_key="bolsa_tx1", value=2.0, source="xm")
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        # same (series_key, ts, source) under a tenant coexists with the
+        # public row (different partial index), but not twice under the tenant
+        session.add(
+            HourlySeries(ts=ts, tenant_id=tenant.id, series_key="bolsa_tx1", value=3.0, source="xm")
+        )
+        session.commit()
+        session.add(
+            HourlySeries(ts=ts, tenant_id=tenant.id, series_key="bolsa_tx1", value=4.0, source="xm")
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        # different source under the same scope is a distinct key
+        session.add(
+            HourlySeries(ts=ts, tenant_id=None, series_key="bolsa_tx1", value=5.0, source="run-1")
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        rows = list(session.scalars(select(HourlySeries)))
+        assert len(rows) == 3

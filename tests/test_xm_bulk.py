@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
 from app.data.xm_bulk import (
     _melt_hourly,
+    _merge_keyed,
     ensure_bulk_data_for_year,
     ensure_dema_come,
     ensure_dispo_come,
@@ -325,3 +326,98 @@ def test_dema_come_all_midnight_rows_have_full_datetime_format(tmp_path):
         # Must match YYYY-MM-DD HH:MM:SS pattern (19 chars total)
         assert len(datetime_str) == 19, f"datetime has wrong format: {datetime_str}"
         assert datetime_str.count(":") == 2, f"datetime missing colons: {datetime_str}"
+
+
+def test_merge_keyed_dedupes_keep_last_and_sorts():
+    existing = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(["2024-04-17 00:00", "2024-04-17 01:00"]),
+            "resource_name": ["A", "A"],
+            "dispo": [100.0, 110.0],
+        }
+    )
+    fresh = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(["2024-04-17 00:00", "2024-04-18 00:00"]),
+            "resource_name": ["A", "A"],
+            "dispo": [999.0, 120.0],
+        }
+    )
+    out = _merge_keyed(existing, fresh, ["datetime", "resource_name"])
+    assert len(out) == 3  # 17:00 row overwritten by fresh, no duplicate
+    row = out[out["datetime"] == pd.Timestamp("2024-04-17 00:00")].iloc[0]
+    assert row["dispo"] == 999.0  # fresh wins on key collision
+    assert (out["datetime"] == out["datetime"].sort_values()).all()
+
+
+class _FakeConsultWindow:
+    """ReadDB stand-in: returns two hourly days for the requested range."""
+
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        self.calls = []
+
+    def request_data(self, coleccion, metrica, start_date, end_date):
+        self.calls.append((coleccion, metrica, start_date, end_date))
+        if coleccion == "ListadoRecursos":
+            return pd.DataFrame(
+                {
+                    "Values_Code": ["2QEK", "3ENA"],
+                    "Values_Name": ["SALTO II", "TERMO NORTE"],
+                    "Values_Type": ["HIDRAULICA", "TERMICA"],
+                }
+            )
+        days = [self.start + timedelta(days=i) for i in range((self.end - self.start).days + 1)]
+        rows = []
+        for day in days:
+            rows.append({"Values_code": "2QEK", "Date": day})
+            rows.append({"Values_code": "3ENA", "Date": day})
+        df = pd.DataFrame(rows)
+        for h in range(1, 25):
+            df[f"Values_Hour{h:02d}"] = 300.0
+        return df
+
+
+def test_refresh_dispo_declarada_is_idempotent_and_merges(tmp_path):
+    from app.data import loaders as loaders_mod
+    from app.data.xm_bulk import refresh_dispo_declarada
+
+    start, end = date(2024, 4, 17), date(2024, 4, 19)
+    consult = _FakeConsultWindow(start, end)
+    crosswalk = pd.DataFrame(
+        {
+            "code": ["2QEK", "3ENA"],
+            "resource_name": ["SALTO II", "TERMO NORTE"],
+            "gen_type": ["HIDRAULICA", "TERMICA"],
+        }
+    )
+    data_dir = str(tmp_path)
+    sub = tmp_path / "dispo_declarada"
+    sub.mkdir()
+    first_day = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
+            "resource_name": ["SALTO II"] * 24,
+            "dispo": [100.0] * 24,
+            "gen_type": ["HIDRAULICA"] * 24,
+        }
+    )
+    first_day.to_csv(sub / "dispo_declarada_2024.csv", index=False)
+
+    refresh_dispo_declarada(start, end, data_dir, consult, crosswalk)
+    df = loaders_mod.load_dispo(data_dir, 2024)
+    assert df["datetime"].dt.date.max() == date(2024, 4, 19)
+    assert len(df) == 144  # 3 days x 2 resources x 24h
+
+    # the keyed merge overwrote the stale local 04-17 value (100.0 -> 300.0)
+    row = df[
+        (df["datetime"].dt.date == date(2024, 4, 17)) & (df["resource_name"] == "SALTO II")
+    ].iloc[0]
+    assert row["dispo"] == 300.0
+
+    # second identical pull must not duplicate rows
+    refresh_dispo_declarada(start, end, data_dir, consult, crosswalk)
+    df2 = loaders_mod.load_dispo(data_dir, 2024)
+    assert len(df2) == 144
+    assert consult.calls.count(("DispoDeclarada", "Recurso", start, end)) == 2

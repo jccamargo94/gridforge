@@ -357,3 +357,210 @@ def test_ensure_ofertas_estimado_matches_names_and_caches(tmp_path):
     (tmp_path / "2026-08-11" / "iMAR0811.txt").unlink()
     cached_result = ensure_ofertas_estimado(fecha, str(tmp_path), dispo, oferta_full)
     assert cached_result.set_index("resource_name")["Value"].to_dict() == values
+
+
+def test_rolling_ultimo_precio_real_wins_on_same_date_tie():
+    from app.data.heuristic.biddings import _rolling_ultimo_precio
+
+    real = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-08-11"), pd.Timestamp("2026-08-11")],
+            "resource_name": ["TERMO1", "TERMO2"],
+            "Value": [150.0, 180.0],
+        }
+    )
+    cached = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-08-11")],
+            "resource_name": ["TERMO1"],
+            "Value": [990.0],
+            "is_estimated": [True],
+        }
+    )
+    out = _rolling_ultimo_precio(real, cached)
+    assert out == {"TERMO1": 150.0, "TERMO2": 180.0}  # tie -> real wins
+
+
+def test_rolling_ultimo_precio_estimate_carries_forward_when_newer():
+    from app.data.heuristic.biddings import _rolling_ultimo_precio
+
+    real = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-07-30"), pd.Timestamp("2026-07-30")],
+            "resource_name": ["TERMO1", "TERMO2"],
+            "Value": [100.0, 180.0],
+        }
+    )
+    cached = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-08-11")],
+            "resource_name": ["TERMO1"],
+            "Value": [990.0],
+            "is_estimated": [True],
+        }
+    )
+    out = _rolling_ultimo_precio(real, cached)
+    assert out == {"TERMO1": 990.0, "TERMO2": 180.0}
+
+
+def test_ensure_ofertas_estimado_rolls_previous_mpo_resolution_forward(tmp_path):
+    fecha1 = _date(2026, 8, 11)
+    fecha2 = _date(2026, 8, 12)
+    _write_prid_imar(tmp_path, "2026-08-11", "0811")  # resolves TERMO1 at hour 5
+
+    # day 2: nobody is at part-load -> nothing resolves; only the union roll works
+    day2 = tmp_path / "2026-08-12"
+    day2.mkdir()
+    (day2 / "PrId0812_NAL.txt").write_text(
+        "TERMO1," + ",".join(["300"] * 24) + "\nTERMO2," + ",".join(["200"] * 24) + "\n",
+        encoding="latin1",
+    )
+    mpo_row = ",".join(["1000"] * 24)
+    (day2 / "iMAR0812.txt").write_text(
+        f'"Costo Marginal",{mpo_row}\n"Delta",' + ",".join(["0"] * 24) + f'\n"MPO",{mpo_row}\n',
+        encoding="latin1",
+    )
+
+    hours1 = [pd.Timestamp(fecha1) + pd.Timedelta(hours=h) for h in range(24)]
+    hours2 = [pd.Timestamp(fecha2) + pd.Timedelta(hours=h) for h in range(24)]
+    dispo1 = pd.DataFrame(
+        [
+            {"resource_name": "TERMO1", "datetime": h, "dispo": 300_000.0, "gen_type": "TERMICA"}
+            for h in hours1
+        ]
+        + [
+            {"resource_name": "TERMO2", "datetime": h, "dispo": 200_000.0, "gen_type": "TERMICA"}
+            for h in hours1
+        ]
+    )
+    dispo2 = pd.DataFrame(
+        [
+            {"resource_name": "TERMO1", "datetime": h, "dispo": 300_000.0, "gen_type": "TERMICA"}
+            for h in hours2
+        ]
+        + [
+            {"resource_name": "TERMO2", "datetime": h, "dispo": 200_000.0, "gen_type": "TERMICA"}
+            for h in hours2
+        ]
+    )
+    oferta_full = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-07-30"), pd.Timestamp("2026-07-30")],
+            "resource_name": ["TERMO1", "TERMO2"],
+            "Value": [100.0, 180.0],
+        }
+    )
+
+    day1 = ensure_ofertas_estimado(fecha1, str(tmp_path), dispo1, oferta_full)
+    assert day1.set_index("resource_name")["Value"].to_dict()["TERMO1"] == 990.0
+
+    # day 2 with NO marginal resolution: TERMO1 must roll the day-1 MPO estimate
+    # (990.0), not fall back to the stale real 100.0 — this is the regression
+    # this task fixes
+    day2_result = ensure_ofertas_estimado(fecha2, str(tmp_path), dispo2, oferta_full)
+    values = day2_result.set_index("resource_name")["Value"].to_dict()
+    assert values["TERMO1"] == 990.0
+    assert values["TERMO2"] == 180.0
+
+
+def test_prune_estimated_rows_drops_covered_pairs_keeps_rest(tmp_path):
+    from datetime import date
+
+    from app.data.heuristic.biddings import prune_estimated_rows
+
+    est_dir = tmp_path / "ofertas_estimado"
+    est_dir.mkdir()
+    cached = pd.DataFrame(
+        [
+            # April pairs the real block covers -> stale, pruned
+            {
+                "Date": pd.Timestamp("2026-04-05"),
+                "resource_name": "TERMO1",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+            {
+                "Date": pd.Timestamp("2026-04-06"),
+                "resource_name": "TERMO2",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+            # April pair the real block does NOT cover -> keeps rolling
+            {
+                "Date": pd.Timestamp("2026-04-07"),
+                "resource_name": "GHOST",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+            # May pair: outside the gated month -> untouched
+            {
+                "Date": pd.Timestamp("2026-05-01"),
+                "resource_name": "TERMO1",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+        ]
+    )
+    cached.to_csv(est_dir / "ofertas_estimado_2026.csv", index=False)
+
+    real = pd.DataFrame(
+        [
+            {
+                "Date": pd.Timestamp("2026-04-01") + pd.Timedelta(days=i),
+                "resource_name": name,
+                "Value": 150.0,
+            }
+            for i in range(30)
+            for name in ("TERMO1", "TERMO2")
+        ]
+    )
+    pruned = prune_estimated_rows(str(tmp_path), date(2026, 4, 1), real)
+    assert pruned == 2
+
+    remaining = pd.read_csv(est_dir / "ofertas_estimado_2026.csv", parse_dates=["Date"])
+    pairs = set(zip(remaining["Date"].dt.date, remaining["resource_name"]))
+    assert pairs == {(date(2026, 4, 7), "GHOST"), (date(2026, 5, 1), "TERMO1")}
+
+
+def test_prune_estimated_rows_noop_without_cache(tmp_path):
+    from datetime import date
+
+    from app.data.heuristic.biddings import prune_estimated_rows
+
+    real = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-04-01")],
+            "resource_name": ["TERMO1"],
+            "Value": [150.0],
+        }
+    )
+    assert prune_estimated_rows(str(tmp_path), date(2026, 4, 1), real) == 0
+
+
+def test_prune_estimated_rows_noop_when_month_not_in_cache(tmp_path):
+    from datetime import date
+
+    from app.data.heuristic.biddings import prune_estimated_rows
+
+    est_dir = tmp_path / "ofertas_estimado"
+    est_dir.mkdir()
+    cached = pd.DataFrame(
+        [
+            {
+                "Date": pd.Timestamp("2026-03-31"),
+                "resource_name": "TERMO1",
+                "Value": 999.0,
+                "is_estimated": True,
+            },
+        ]
+    )
+    cached.to_csv(est_dir / "ofertas_estimado_2026.csv", index=False)
+
+    real = pd.DataFrame(
+        {
+            "Date": [pd.Timestamp("2026-04-01")],
+            "resource_name": ["TERMO1"],
+            "Value": [150.0],
+        }
+    )
+    assert prune_estimated_rows(str(tmp_path), date(2026, 4, 1), real) == 0

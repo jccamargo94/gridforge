@@ -539,6 +539,33 @@ corrida ya habia escrito una fila en `metric_sets` antes de atascarse, borrar
 esa fila primero — `metric_sets.run_id` es unico, y una segunda escritura
 fallara con un error de constraint.
 
+#### Scheduler de corridas diarias (automatico)
+
+Desde Fase 7A el worker (ademas de la cola manual de `POST /runs`) ejecuta
+planes diarios: por cada fecha corre una version *provisional* (D-1, insumos
+pronosticados) y despues una *settled* (cuando XM publica los reales), re-evalua
+metricas contra la referencia final (iMAR / bolsa TX1) sin re-resolver, refresca
+los year CSVs incrementalmente y expone las corridas de sistema como publicas.
+El estado vive en la tabla `run_plans` (no expuesta por API; auditable por
+status + logs del worker).
+
+Variables de entorno del worker (todas con default, ver `app/scheduler/config.py`):
+
+| var | default | significado |
+|---|---|---|
+| `DAILY_ENABLED` | `true` | kill switch del scheduler |
+| `SCHEDULER_TZ` | `America/Bogota` | zona de ventanas |
+| `PLAN_TICK_SECONDS` | `60` | periodo del plan tick |
+| `PLAN_MAX_ATTEMPTS` | `3` | reintentos por ventana |
+| `PLAN_RETRY_MINUTES` | `15` | separacion minima entre reintentos |
+| `DATA_REFRESH_INTERVAL_MINUTES` | `60` | periodo del freshness tick |
+| `DATA_REFRESH_WINDOW_DAYS` | `7` | ventana minima del pull incremental |
+| `SWEEP_TIME` | `05:30` | hora diaria de sweeps TX1 |
+| `REEVAL_PREIDEAL_TIME` | `18:00` | earliest de reeval_preideal |
+| `DAILY_EARLIEST` / `DAILY_DEADLINE` | `15:00` / `23:59` | ventana de corridas frescas (D-1) |
+
+Desplegar con `DAILY_ENABLED=false` deja el worker exactamente como antes.
+
 ### Frontend (Fase 4)
 
 Desde Fase 4 el repo incluye un frontend Next.js (`frontend/`) construido con

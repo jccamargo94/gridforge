@@ -1,6 +1,7 @@
 import pandas as pd
 
 from app.data.loaders import (
+    clear_loader_caches,
     load_demanda,
     load_dispo,
     load_dispo_come,
@@ -137,3 +138,13 @@ def test_cache_info_reflects_hits(tmp_path):
     info2 = load_dispo.cache_info()
     assert info2.hits == 1
     assert info2.misses == 1
+
+
+def test_clear_loader_caches_empties_year_loader_caches(tmp_path):
+    sub = tmp_path / "dispo_declarada"
+    sub.mkdir()
+    (sub / "dispo_declarada_2024.csv").write_text("datetime,resource_name,dispo,gen_type\n")
+    load_dispo(str(tmp_path), 2024)
+    assert load_dispo.cache_info().currsize >= 1
+    clear_loader_caches()
+    assert load_dispo.cache_info().currsize == 0

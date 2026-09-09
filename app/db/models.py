@@ -56,7 +56,9 @@ class Run(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
     case_id: Mapped[str] = mapped_column(String, ForeignKey("cases.id"), nullable=False)
-    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    visibility: Mapped[str] = mapped_column(String, default="private")
+    input_grade: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="pending")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
@@ -89,6 +91,8 @@ class MetricSet(Base):
     bess_net_revenue: Mapped[float | None] = mapped_column(Float, nullable=True)
     dispatch_mae_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
     dispatch_rmse_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reference: Mapped[str | None] = mapped_column(String, nullable=True)
+    evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class NodalResult(Base):
@@ -126,3 +130,24 @@ class InputDataset(Base):
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class RunPlan(Base):
+    __tablename__ = "run_plans"
+    __table_args__ = (
+        UniqueConstraint("kind", "target_date", name="uq_run_plans_kind_target_date"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    target_date: Mapped[date_] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    run_id: Mapped[str | None] = mapped_column(String, ForeignKey("runs.id"), nullable=True)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

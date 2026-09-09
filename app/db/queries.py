@@ -1,10 +1,10 @@
 from datetime import date as date_
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, Scenario
+from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, RunPlan, Scenario
 from app.schemas import BessScenario, NodalRunResult, RunResult
 
 
@@ -38,8 +38,10 @@ def create_case_and_run(
     solver: str,
     compute_prices: bool,
     scenario_id: str | None,
-    user_id: str,
+    user_id: str | None = None,
     nodal_network: dict | None = None,
+    visibility: str = "private",
+    input_grade: str | None = None,
 ) -> Run:
     case = Case(
         dispatch_date=dispatch_date,
@@ -52,7 +54,13 @@ def create_case_and_run(
     session.add(case)
     session.flush()  # populate case.id before Run references it
 
-    run = Run(case_id=case.id, user_id=user_id, status="pending")
+    run = Run(
+        case_id=case.id,
+        user_id=user_id,
+        status="pending",
+        visibility=visibility,
+        input_grade=input_grade,
+    )
     session.add(run)
     session.commit()
     session.refresh(run)
@@ -77,7 +85,14 @@ def get_metric_set(session: Session, run_id: str) -> MetricSet | None:
     return session.scalars(stmt).first()
 
 
-def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -> None:
+def finish_run_ok(
+    session: Session,
+    run: Run,
+    result: RunResult,
+    out_dir: str,
+    *,
+    reference: str | None = None,
+) -> None:
     run.status = "done"
     run.finished_at = datetime.now(timezone.utc)
     run.out_dir = out_dir
@@ -105,6 +120,8 @@ def finish_run_ok(session: Session, run: Run, result: RunResult, out_dir: str) -
                 bess_net_revenue=bess.get("bess_net_revenue"),
                 dispatch_mae_mw=metrics.get("dispatch_mae_mw"),
                 dispatch_rmse_mw=metrics.get("dispatch_rmse_mw"),
+                reference=reference,
+                evaluated_at=datetime.now(timezone.utc) if reference else None,
             )
         )
     session.commit()
@@ -201,3 +218,126 @@ def get_input_dataset(session: Session, dataset: str, partition_key: str) -> Inp
         InputDataset.dataset == dataset, InputDataset.partition_key == partition_key
     )
     return session.scalars(stmt).first()
+
+
+def update_metric_set(
+    session: Session, run_id: str, *, metrics: dict[str, float], reference: str
+) -> MetricSet:
+    """Overwrite a run's price metrics against an explicit reference.
+
+    Keeps the dispatch columns (dispatch_mae_mw/dispatch_rmse_mw) untouched —
+    they need the solved model, which post-hoc re-evaluation does not have.
+    """
+    ms = get_metric_set(session, run_id)
+    if ms is None:
+        ms = MetricSet(run_id=run_id)
+    ms.rmse = metrics.get("rmse")
+    ms.mae = metrics.get("mae")
+    ms.bias = metrics.get("bias")
+    ms.wape = metrics.get("wape")
+    ms.smape = metrics.get("smape")
+    ms.r2 = metrics.get("r2")
+    ms.reference = reference
+    ms.evaluated_at = datetime.now(timezone.utc)
+    session.add(ms)
+    session.commit()
+    session.refresh(ms)
+    return ms
+
+
+def list_visible_runs(session: Session, user_id: str) -> list[Run]:
+    stmt = (
+        select(Run)
+        .where(or_(Run.user_id == user_id, Run.visibility == "public"))
+        .order_by(Run.created_at.desc())
+    )
+    return list(session.scalars(stmt))
+
+
+def create_run_plan(
+    session: Session, *, kind: str, target_date: date_, due_at: datetime
+) -> RunPlan:
+    row = RunPlan(kind=kind, target_date=target_date, due_at=due_at)
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def get_run_plan(session: Session, kind: str, target_date: date_) -> RunPlan | None:
+    stmt = select(RunPlan).where(RunPlan.kind == kind, RunPlan.target_date == target_date)
+    return session.scalars(stmt).first()
+
+
+def list_claimable_plans(session: Session, *, now: datetime, max_attempts: int) -> list[RunPlan]:
+    # finished_at IS NULL excludes terminal failures (marked failed with no
+    # retry scheduled): only pending and retry-scheduled failed plans are
+    # claimable again.
+    stmt = (
+        select(RunPlan)
+        .where(
+            RunPlan.due_at <= now,
+            RunPlan.status.in_(["pending", "failed"]),
+            RunPlan.finished_at.is_(None),
+            or_(RunPlan.status == "pending", RunPlan.attempts < max_attempts),
+        )
+        .order_by(RunPlan.due_at, RunPlan.created_at)
+    )
+    return list(session.scalars(stmt))
+
+
+def mark_plan_done(session: Session, plan: RunPlan, *, run_id: str | None = None) -> None:
+    plan.status = "done"
+    plan.run_id = run_id
+    plan.finished_at = datetime.now(timezone.utc)
+    session.add(plan)
+    session.commit()
+
+
+def mark_plan_failed(
+    session: Session,
+    plan: RunPlan,
+    *,
+    error: str,
+    run_id: str | None = None,
+    retry_at: datetime | None = None,
+) -> None:
+    plan.status = "failed"
+    plan.error = error
+    if run_id is not None:
+        plan.run_id = run_id
+    if retry_at is not None:
+        plan.due_at = retry_at
+    else:
+        plan.finished_at = datetime.now(timezone.utc)
+    session.add(plan)
+    session.commit()
+    if retry_at is not None:
+        # SQLite stores DateTime(timezone=True) without the offset and commit()
+        # reloads the row, so due_at would come back naive. Re-set the in-memory
+        # value so callers comparing against the tz-aware retry instant (repo
+        # pattern: timestamps tz-aware UTC) don't see a bare datetime.
+        plan.due_at = retry_at
+
+
+def mark_plan_skipped(session: Session, plan: RunPlan, *, reason: str) -> None:
+    plan.status = "skipped"
+    plan.error = reason
+    plan.finished_at = datetime.now(timezone.utc)
+    session.add(plan)
+    session.commit()
+
+
+def list_done_public_dispatch_runs(session: Session) -> list[tuple[Run, Case]]:
+    """Public done runs of the dispatch levels the chart series consumes."""
+    stmt = (
+        select(Run, Case)
+        .join(Case, Run.case_id == Case.id)
+        .where(
+            Run.visibility == "public",
+            Run.status == "done",
+            Case.level.in_(["preideal", "ideal"]),
+        )
+        .order_by(Run.created_at.desc())
+    )
+    return list(session.execute(stmt))

@@ -379,3 +379,135 @@ def test_finish_nodal_run_ok_requires_nodal_result():
     result = RunResult(case=dispatch_case, ok=True, nodal=None)
     with pytest.raises(AssertionError):
         queries.finish_nodal_run_ok(session, run, result, out_dir="data/results/x")
+
+
+def test_create_case_and_run_defaults_to_private_no_grade():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+    )
+    assert run.user_id is None
+    assert run.visibility == "private"
+    assert run.input_grade is None
+
+
+def test_create_case_and_run_system_grade_and_visibility():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id=None,
+        visibility="public",
+        input_grade="provisional",
+    )
+    assert run.visibility == "public"
+    assert run.input_grade == "provisional"
+
+
+def test_finish_run_ok_stamps_reference_only_when_given():
+    session = _session()
+    case = DispatchCase(dispatch_date=date(2024, 4, 18), level=DispatchLevel.preideal)
+
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+    )
+    queries.finish_run_ok(
+        session, run, RunResult(case=case, ok=True, metrics={"mae": 1.0}), out_dir="out"
+    )
+    ms = queries.get_metric_set(session, run.id)
+    assert ms.reference is None
+    assert ms.evaluated_at is None
+
+    run2 = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+    )
+    queries.finish_run_ok(
+        session,
+        run2,
+        RunResult(case=case, ok=True, metrics={"mae": 2.0}),
+        out_dir="out",
+        reference="iMAR",
+    )
+    ms2 = queries.get_metric_set(session, run2.id)
+    assert ms2.reference == "iMAR"
+    assert ms2.evaluated_at is not None
+
+
+def test_update_metric_set_overwrites_price_metrics_and_reference():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="ideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+    )
+    case = DispatchCase(dispatch_date=date(2024, 4, 18), level=DispatchLevel.ideal)
+    queries.finish_run_ok(
+        session, run, RunResult(case=case, ok=True, metrics={"mae": 1.0}), out_dir="out"
+    )
+    ms = queries.update_metric_set(
+        session, run.id, metrics={"mae": 9.0, "rmse": 3.0}, reference="bolsa_tx1"
+    )
+    assert ms.reference == "bolsa_tx1"
+    assert ms.mae == 9.0
+    assert ms.rmse == 3.0
+    assert ms.evaluated_at is not None
+
+
+def test_list_visible_runs_returns_own_and_public():
+    session = _session()
+    mine = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-1",
+    )
+    other_private = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 19),
+        level="preideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="user-2",
+    )
+    public_other = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 20),
+        level="ideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id=None,
+        visibility="public",
+        input_grade="provisional",
+    )
+    visible = queries.list_visible_runs(session, "user-1")
+    ids = [r.id for r in visible]
+    assert mine.id in ids
+    assert other_private.id not in ids
+    assert public_other.id in ids

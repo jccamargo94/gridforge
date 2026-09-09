@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.db import queries
 from app.db.models import Base, Run
+from app.scheduler.config import SchedulerConfig
 from app.schemas import DispatchCase, DispatchLevel, RunResult
-from services.worker.main import process_once
+from services.worker.main import main, main_iteration, process_once
 
 DD = str(Path(__file__).parent / "fixtures" / "xm_smoke")
 FECHA = date(2024, 4, 18)
@@ -84,7 +85,7 @@ def test_process_once_marks_run_failed_when_run_case_reports_failure(tmp_path, m
 
     case = DispatchCase(dispatch_date=FECHA, level=DispatchLevel.preideal, solver="cbc")
     fake_result = RunResult(case=case, ok=False, error="boom")
-    monkeypatch.setattr("services.worker.main.run_case", lambda *a, **kw: fake_result)
+    monkeypatch.setattr("app.scheduler.executor.run_case", lambda *a, **kw: fake_result)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -110,7 +111,7 @@ def test_process_once_marks_run_failed_when_run_case_raises(tmp_path, monkeypatc
     def _raise(*a, **kw):
         raise RuntimeError("solver exploded")
 
-    monkeypatch.setattr("services.worker.main.run_case", _raise)
+    monkeypatch.setattr("app.scheduler.executor.run_case", _raise)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -226,7 +227,7 @@ def test_process_once_captures_messages_emitted_via_logging_not_just_print(tmp_p
         logging.getLogger("egret.fake").warning("dual suffix warning via logging, not print")
         return RunResult(case=case, ok=True)
 
-    monkeypatch.setattr("services.worker.main.run_case", _fake_run_case)
+    monkeypatch.setattr("app.scheduler.executor.run_case", _fake_run_case)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -257,7 +258,7 @@ def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, m
             pass
         raise SQLAlchemyError("db exploded")
 
-    monkeypatch.setattr("services.worker.main.run_case", _raise_db_error)
+    monkeypatch.setattr("app.scheduler.executor.run_case", _raise_db_error)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -265,3 +266,87 @@ def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, m
     updated = queries.get_run(session, run.id)
     assert updated.status == "failed"
     assert updated.error is not None
+
+
+NOW = datetime(2026, 9, 8, 21, 0, tzinfo=timezone.utc)
+
+
+def test_main_reconciles_stale_running_once_before_loop(monkeypatch):
+    """F2: the boot path runs the stale-running reconcile exactly once, before
+    the polling loop starts."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr("services.worker.main.get_engine", lambda: engine)
+    reconciled = []
+    monkeypatch.setattr(
+        "services.worker.main.reconcile_stale_running",
+        lambda *a, **kw: reconciled.append((a, kw)),
+    )
+    monkeypatch.setattr("services.worker.main.main_iteration", lambda session, state: state)
+    slept = []
+
+    def _stop_sleeping(*a, **kw):
+        slept.append(a)
+        raise SystemExit(0)  # unwind the infinite polling loop after one pass
+
+    monkeypatch.setattr("services.worker.main.time.sleep", _stop_sleeping)
+
+    with pytest.raises(SystemExit):
+        main()
+
+    assert len(reconciled) == 1
+    # called with a session (positional) and an injected aware `now` keyword
+    _session_arg, kwargs = reconciled[0]
+    assert "now" in kwargs and kwargs["now"].tzinfo is not None
+    assert len(slept) == 1
+
+
+def test_main_iteration_disabled_runs_only_manual_lane(monkeypatch):
+    session = _session()
+    calls = []
+    monkeypatch.setattr("app.scheduler.tick.plan_tick", lambda *a, **kw: calls.append("plan"))
+    monkeypatch.setattr(
+        "app.scheduler.refresh.refresh_tick", lambda *a, **kw: calls.append("refresh")
+    )
+    monkeypatch.setattr(
+        "app.scheduler.plans.sweep_create_rows", lambda *a, **kw: calls.append("sweep")
+    )
+    monkeypatch.setattr(
+        "services.worker.main.process_once", lambda *a, **kw: calls.append("manual")
+    )
+
+    config = SchedulerConfig(daily_enabled=False)
+    main_iteration(session, now=NOW, config=config)
+    assert calls == ["manual"]
+
+
+def test_main_iteration_runs_plan_tick_and_manual_lane(monkeypatch):
+    session = _session()
+    calls = []
+    monkeypatch.setattr("app.scheduler.tick.plan_tick", lambda *a, **kw: calls.append("plan"))
+    monkeypatch.setattr(
+        "app.scheduler.refresh.refresh_tick", lambda *a, **kw: calls.append("refresh")
+    )
+    monkeypatch.setattr(
+        "app.scheduler.plans.sweep_create_rows", lambda *a, **kw: calls.append("sweep")
+    )
+    monkeypatch.setattr(
+        "services.worker.main.process_once", lambda *a, **kw: calls.append("manual")
+    )
+
+    config = SchedulerConfig(daily_enabled=True)
+    state = main_iteration(session, now=NOW, config=config)
+    # first pass: every tick deadline starts at 0.0 -> refresh + plan fire.
+    # REFRESH RUNS BEFORE PLAN (post-final-review amendment): a plan claim in
+    # the same pass must observe the series rows/blobs fetched by that pass's
+    # refresh, otherwise a clean deployment would gate on yesterday's files.
+    # sweep: 21:00 UTC == 16:00 Bogota >= 05:30 -> fires; manual lane runs once
+    assert calls == ["refresh", "plan", "sweep", "manual"]
+    assert state.last_sweep_date == date(2026, 9, 8)
+    assert state.plan_next > 0
+
+    # second immediate pass: plan tick not due again (60 s), refresh not due
+    # (3600 s), sweep already done today -> manual lane only
+    calls.clear()
+    main_iteration(session, state=state, now=NOW, config=config)
+    assert calls == ["manual"]

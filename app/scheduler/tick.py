@@ -60,7 +60,17 @@ def plan_tick(
             continue
         open_at, close_at = timeutil.window_edges(plan.kind, plan.target_date, config)
         if close_at is not None and now > close_at:
-            queries.mark_plan_skipped(session, plan, reason=REASON_WINDOW_EXPIRED)
+            if plan.attempts == 0:
+                # Never attempted: an honest skip keeps the audit trail clean.
+                queries.mark_plan_skipped(session, plan, reason=REASON_WINDOW_EXPIRED)
+            else:
+                # It ran and failed (attempts > 0): terminal failure, not a
+                # skip — mark_plan_skipped would erase the retry history. The
+                # window is gone so there is no retry_at: finished_at stamps
+                # the row terminal and list_claimable_plans drops it.
+                queries.mark_plan_failed(
+                    session, plan, error=plan.error or "ventana vencida tras reintentos"
+                )
             continue
         if open_at is not None and now < open_at:
             continue

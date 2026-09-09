@@ -92,6 +92,59 @@ def test_plan_tick_skips_expired_window_with_reason(monkeypatch):
     assert plan.error == "ventana vencida"
 
 
+def test_plan_tick_expiry_of_retried_plan_is_terminal_failure(monkeypatch):
+    """M1: a plan with attempts > 0 (it ran and failed) that ages out of the
+    window must be marked TERMINAL failure, not skipped — skipping would lose
+    the audit trail of the attempts already made."""
+    # never let ensure_daily_plans create real rows for "tomorrow"
+    monkeypatch.setattr(tick, "ensure_daily_plans", lambda *a, **kw: 0)
+    session = _session()
+    retried = RunPlan(
+        kind="ideal_daily",
+        target_date=TARGET,
+        status="failed",
+        attempts=2,
+        error="RuntimeError: solve exploded",
+        due_at=NOW_OPEN,  # retry scheduled inside the old window
+    )
+    session.add(retried)
+    session.commit()
+    now_after_close = datetime(2026, 9, 9, 5, 30, tzinfo=UTC)  # 00:30 Bogota D
+
+    result = tick.plan_tick(session, now=now_after_close, config=CONFIG, data_dir=DD)
+
+    assert result == 0
+    session.expire_all()
+    assert retried.status == "failed"  # terminal: not claimable again
+    assert retried.error == "RuntimeError: solve exploded"  # audit trail kept
+    assert retried.finished_at is not None
+
+
+def test_plan_tick_expiry_of_retried_plan_without_error_uses_default(monkeypatch):
+    """M1 fallback: a retried plan without an error message gets the default
+    terminal-failure text."""
+    # never let ensure_daily_plans create real rows for "tomorrow"
+    monkeypatch.setattr(tick, "ensure_daily_plans", lambda *a, **kw: 0)
+    session = _session()
+    retried = RunPlan(
+        kind="ideal_daily",
+        target_date=TARGET,
+        status="failed",
+        attempts=1,
+        due_at=NOW_OPEN,
+    )
+    session.add(retried)
+    session.commit()
+    now_after_close = datetime(2026, 9, 9, 5, 30, tzinfo=UTC)  # 00:30 Bogota D
+
+    tick.plan_tick(session, now=now_after_close, config=CONFIG, data_dir=DD)
+
+    session.expire_all()
+    assert retried.status == "failed"
+    assert retried.error == "ventana vencida tras reintentos"
+    assert retried.finished_at is not None
+
+
 def test_plan_tick_waits_when_inputs_missing_not_permanent(monkeypatch):
     # never let ensure_daily_plans create real rows for "tomorrow"
     monkeypatch.setattr(tick, "ensure_daily_plans", lambda *a, **kw: 0)

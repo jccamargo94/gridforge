@@ -318,7 +318,7 @@ def get_chart_series(
     from zoneinfo import ZoneInfo
 
     today = datetime.now(ZoneInfo("America/Bogota")).date()
-    return build_chart_series(session, days=days, today=today, data_dir="data")
+    return build_chart_series(session, days=days, today=today, user_id=user_id)
 
 
 @app.get("/runs/{run_id}")

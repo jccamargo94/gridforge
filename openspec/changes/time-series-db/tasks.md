@@ -36,15 +36,15 @@ Chain strategy: size-exception
 - [x] 2.2 GREEN `app/db/series.py`: `upsert_hourly_rows`, one statement/commit per batch
 - [x] 2.3 RED `tests/test_scheduler_refresh.py`: tick writes 24 public rows/series (SCN-HS-02-01/02)
 - [x] 2.4 GREEN: hook `ingest_external_window` into `refresh_tick` after ensure_data_for_date (refresh.py:107-108)
-- [ ] 2.5 RED: `finish_run_ok` (queries.py:88): 24 ideal rows source=run_id; public→NULL; multi-tenant owner→each tenant (B1); zero-membership→none (SCN-HS-03-02); B3: bad price_path/absent CSVs never raise (executor.py:107-112)
-- [ ] 2.6 GREEN: `ingest_run_price_rows` hook before queries.py:127 commit; membership keyed on owner user_id (JWT sub); `finish_nodal_run_ok` untouched (D6)
+- [x] 2.5 RED: `finish_run_ok` (queries.py:88): 24 ideal rows source=run_id; public→NULL; multi-tenant owner→each tenant (B1); zero-membership→none (SCN-HS-03-02); B3: bad price_path/absent CSVs never raise (executor.py:107-112)
+- [x] 2.6 GREEN: `ingest_run_price_rows` hook before queries.py:127 commit; membership keyed on owner user_id (JWT sub); `finish_nodal_run_ok` untouched (D6)
 
 ## Phase 3: Serving (U3)
 
-- [ ] 3.1 RED `tests/test_api_chart.py`: seed DD via ingest (:11); `_finish_public_run` writes rows (:14); key-set (:98-108) gains 5 `*_hourly` keys; goldens (:88-89) unchanged; daily==mean(hours), empty day→null (SCN-HC-01-01/02)
-- [ ] 3.2 GREEN `chart.py`: `fetch_visible_rows` scope NULL OR IN(caller tenants) (REQ-HS-05); runs-side winner per (day,key), grade then created_at desc (B2; extend queries.py:331); hourly arrays Bogota-local; `*_run_id` kept
-- [ ] 3.3 `services/api/main.py` (:310): pass user_id into `build_chart_series`
-- [ ] 3.4 RED+GREEN `tests/test_series_isolation.py`: member A sees public+A, never B; non-member public only (SCN-HS-05-02, SCN-HC-02-02)
+- [x] 3.1 RED `tests/test_api_chart.py`: seed DD via ingest (:11); `_finish_public_run` writes rows (:14); key-set (:98-108) gains 5 `*_hourly` keys; goldens (:88-89) unchanged; daily==mean(hours), empty day→null (SCN-HC-01-01/02)
+- [x] 3.2 GREEN `chart.py`: `fetch_visible_rows` scope NULL OR IN(caller tenants) (REQ-HS-05); runs-side winner per (day,key), grade then created_at desc (B2; extend queries.py:331); hourly arrays Bogota-local; `*_run_id` kept
+- [x] 3.3 `services/api/main.py` (:310): pass user_id into `build_chart_series`
+- [x] 3.4 RED+GREEN `tests/test_series_isolation.py`: member A sees public+A, never B; non-member public only (SCN-HS-05-02, SCN-HC-02-02)
 
 ## Phase 4: Backfill, Goldens, Closeout (U4)
 

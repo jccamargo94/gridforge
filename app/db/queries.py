@@ -4,7 +4,16 @@ from datetime import datetime, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, RunPlan, Scenario
+from app.db.models import (
+    Case,
+    InputDataset,
+    MetricSet,
+    NodalResult,
+    Run,
+    RunPlan,
+    Scenario,
+    TenantMember,
+)
 from app.db.series import ingest_run_price_rows
 from app.schemas import BessScenario, NodalRunResult, RunResult
 
@@ -334,16 +343,34 @@ def mark_plan_skipped(session: Session, plan: RunPlan, *, reason: str) -> None:
     session.commit()
 
 
-def list_done_public_dispatch_runs(session: Session) -> list[tuple[Run, Case]]:
-    """Public done runs of the dispatch levels the chart series consumes."""
+def list_done_public_dispatch_runs(
+    session: Session, user_id: str | None = None
+) -> list[tuple[Run, Case]]:
+    """Done runs of the dispatch levels the chart consumes, scoped to the
+    hourly rows a caller may see (B2).
+
+    user_id None keeps the historical public-only scope. With a user id the
+    scope mirrors `hourly_series` visibility: public runs plus runs whose
+    owner belongs to one of the caller's tenants (their rows live under
+    those tenants). Runs whose owner has no membership write no rows and are
+    excluded either way.
+    """
     stmt = (
         select(Run, Case)
         .join(Case, Run.case_id == Case.id)
         .where(
-            Run.visibility == "public",
             Run.status == "done",
             Case.level.in_(["preideal", "ideal"]),
         )
         .order_by(Run.created_at.desc())
     )
+    if user_id is None:
+        stmt = stmt.where(Run.visibility == "public")
+    else:
+        co_tenant_owners = select(TenantMember.user_id).where(
+            TenantMember.tenant_id.in_(
+                select(TenantMember.tenant_id).where(TenantMember.user_id == user_id)
+            )
+        )
+        stmt = stmt.where(or_(Run.visibility == "public", Run.user_id.in_(co_tenant_owners)))
     return list(session.execute(stmt))

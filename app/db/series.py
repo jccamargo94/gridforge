@@ -23,7 +23,7 @@ from typing import Sequence
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
@@ -171,6 +171,29 @@ def _external_day_rows(day: date, data_dir: str) -> list[HourlySeries]:
                 )
             )
     return rows
+
+
+def fetch_visible_rows(
+    session: Session,
+    *,
+    start: date,
+    end: date,
+    tenant_ids: Sequence[str] = (),
+) -> list[HourlySeries]:
+    """REQ-HS-05: hourly rows over Bogota days [start, end] (inclusive) that
+    a caller may see: public rows (tenant NULL) always, tenant rows only for
+    the given tenant memberships. Ordered by ts."""
+    start_utc, _ = bogota_day_bounds(start)
+    _, end_utc = bogota_day_bounds(end)
+    scope = [HourlySeries.tenant_id.is_(None)]
+    if tenant_ids:
+        scope.append(HourlySeries.tenant_id.in_(tenant_ids))
+    stmt = (
+        select(HourlySeries)
+        .where(HourlySeries.ts >= start_utc, HourlySeries.ts < end_utc, or_(*scope))
+        .order_by(HourlySeries.ts)
+    )
+    return list(session.scalars(stmt))
 
 
 def ingest_external_window(

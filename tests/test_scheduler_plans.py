@@ -101,8 +101,17 @@ def test_create_settled_rows_for_month_creates_every_day_once():
     assert again == 0
 
 
-def test_next_settlement_month_requires_complete_previous_month():
-    # fixture ofertas only covers 2024-04-18 -> no complete month before April
+def test_next_settlement_month_finds_the_closed_fixture_month():
+    # Task 16 added a complete synthetic month (2024-03) to the fixture; a May
+    # now must resolve it as the most recent complete month before May.
     session = _session()
     now = datetime(2024, 5, 10, 12, 0, tzinfo=UTC)
+    assert next_settlement_month(session, now=now, config=CONFIG, data_dir=DD) == date(2024, 3, 1)
+
+
+def test_next_settlement_month_none_when_no_complete_previous_month():
+    # Mid-February 2024: every month before it (Jan 2024 and all of 2023) is
+    # absent from the fixture, so no complete month exists before the current one.
+    session = _session()
+    now = datetime(2024, 2, 15, 12, 0, tzinfo=UTC)
     assert next_settlement_month(session, now=now, config=CONFIG, data_dir=DD) is None

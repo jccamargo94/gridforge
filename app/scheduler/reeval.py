@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from app.data import download
 from app.data.actuals import load_actual_bolsa, load_actual_price
 from app.db import queries
 from app.storage import get_storage
@@ -47,6 +48,12 @@ def reevaluate_metrics(session, run, *, reference: str, data_dir: str = "data") 
     case = queries.get_case(session, run.case_id)
     if case is None:
         raise ValueError(f"run {run.id} sin case")
+    if reference == "iMAR":
+        # The reeval must always read the FINAL iMAR(D): XM modifies the blob
+        # up to ~165 min after its ~09:58 creation, and ensure_data_for_date
+        # never refreshes an existing file — force-refresh it first (bolsa_tx1
+        # needs no refresh: the year CSV is kept fresh by the refresh tick).
+        download.force_refresh_blob("iMAR", case.dispatch_date, data_dir)
     xm = actual_fn(case.dispatch_date, data_dir=data_dir)
     n = min(len(xm), len(model_mpo))
     metrics = price_metrics(xm[:n], model_mpo[:n])

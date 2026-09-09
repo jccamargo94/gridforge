@@ -67,17 +67,32 @@ def test_window_edges_daily_kinds_on_previous_bogota_day():
     assert window_edges("ideal_daily", target, config) == (open_at, close_at)
 
 
-def test_window_edges_reeval_preideal_uses_reeval_time():
+def test_window_edges_reeval_preideal_is_open_ended_from_reeval_time():
     config = SchedulerConfig()
     open_at, close_at = window_edges("reeval_preideal", date(2026, 9, 10), config)
+    # opens D-1 18:00 Bogota (23:00 UTC) and NEVER closes (post-final-review
+    # amendment): the reeval evaluates against the FINAL iMAR whenever it
+    # runs, so a later day yields the same result — this makes sweep-healed
+    # rows functional and covers source runs that finished after D-1 23:59.
     assert open_at == datetime(2026, 9, 9, 23, 0, tzinfo=UTC)  # 18:00 Bogota
-    assert close_at == datetime(2026, 9, 10, 4, 59, 0, tzinfo=UTC)
+    assert close_at is None
 
 
 def test_window_edges_open_ended_kinds_have_no_bounds():
     config = SchedulerConfig()
-    for kind in ("reeval_ideal", "lmp_settled", "preideal_settled", "ideal_settled"):
-        assert window_edges(kind, date(2026, 9, 10), config) == (None, None)
+    for kind in (
+        "reeval_preideal",
+        "reeval_ideal",
+        "lmp_settled",
+        "preideal_settled",
+        "ideal_settled",
+    ):
+        assert window_edges(kind, date(2026, 9, 10), config) is not None
+        open_at, close_at = window_edges(kind, date(2026, 9, 10), config)
+        if kind == "reeval_preideal":
+            assert open_at is not None and close_at is None
+        else:
+            assert open_at is None and close_at is None
 
 
 def test_retry_due_adds_retry_minutes():

@@ -1,6 +1,10 @@
 from datetime import date
 
-from app.data.download import ensure_data_for_date, save_file
+from app.data.download import (
+    ensure_data_for_date,
+    force_refresh_blob,
+    save_file,
+)
 from app.storage import LocalStorage
 
 
@@ -69,3 +73,50 @@ def test_ensure_data_for_date_fetches_missing_files(monkeypatch, tmp_path):
     assert "OFEI" not in fetched, "OFEI should not be re-fetched"
     # Exactly the 5 missing types should be fetched
     assert set(fetched) == {"dCondIniU", "dCondIniP", "PrId", "iMAR", "dAGCUNIDAD"}
+
+
+def test_force_refresh_blob_overwrites_flat_and_organized_copies(monkeypatch, tmp_path):
+    """Post-final-review: reeval needs the FINAL iMAR, and ensure_data_for_date
+    never refreshes existing files — force_refresh_blob re-downloads and
+    truncate-writes every local copy (flat + organized, which resolve_input
+    prefers)."""
+    captured = {}
+
+    def _fake_get(url, params=None, **kwargs):
+        captured["params"] = params
+        return _FakeResponse("final-áé".encode("utf-8"))
+
+    monkeypatch.setattr("app.data.download.requests.get", _fake_get)
+
+    flat = tmp_path / "2024-04-18"
+    flat.mkdir(parents=True)
+    (flat / "iMAR0418.txt").write_text("stale")
+    organized = tmp_path / "predespacho_ideal"
+    organized.mkdir()
+    (organized / "iMAR0418.txt").write_text("stale-organized")
+
+    force_refresh_blob(file_type="iMAR", file_date=date(2024, 4, 18), data_dir=str(tmp_path))
+
+    assert captured["params"] == {
+        "ruta": "M:/InformacionAgentes/Usuarios/Publico/PredespachoIdeal/2024-04/iMAR0418.txt",
+        "nombreBlobContainer": "storageportalxm",
+    }
+    assert (flat / "iMAR0418.txt").read_text() == "final-áé"
+    assert (organized / "iMAR0418.txt").read_text() == "final-áé"
+
+
+def test_force_refresh_blob_does_not_create_organized_copy_when_absent(monkeypatch, tmp_path):
+    """Only the flat layout present -> only the flat copy is (re)written; the
+    organized copy must not materialize out of nowhere."""
+    flat = tmp_path / "2024-04-18"
+    flat.mkdir(parents=True)
+    (flat / "iMAR0418.txt").write_text("stale")
+
+    monkeypatch.setattr(
+        "app.data.download.requests.get",
+        lambda *a, **kw: _FakeResponse("final".encode("utf-8")),
+    )
+    force_refresh_blob(file_type="iMAR", file_date=date(2024, 4, 18), data_dir=str(tmp_path))
+
+    assert (flat / "iMAR0418.txt").read_text() == "final"
+    assert not (tmp_path / "predespacho_ideal" / "iMAR0418.txt").exists()

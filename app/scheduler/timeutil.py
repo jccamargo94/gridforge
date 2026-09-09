@@ -3,9 +3,12 @@
 Window policy (documented for the orchestrator, see plan Notes):
 - preideal_daily / ideal_daily: previous Bogota calendar day,
   DAILY_EARLIEST..DAILY_DEADLINE (spec section 4: D-1 15:00-23:59).
-- reeval_preideal: same day, REEVAL_PREIDEAL_TIME..DAILY_DEADLINE (iMAR(D) is
-  final by ~16:25 Bogota: published 09:00-13:40 with a ~165 min modification
-  window, so 18:00 is safely past it).
+- reeval_preideal: open-ended from D-1 REEVAL_PREIDEAL_TIME (post-final-review
+  amendment). It evaluates against the FINAL iMAR(D) whenever it runs — the
+  same result on any later day — so the window never closes: sweep-healed
+  rows stay functional and source runs that finished after D-1 23:59 are
+  still covered. (iMAR(D) is final by ~16:25 Bogota: published 09:00-13:40
+  with a ~165 min modification window, so 18:00 is safely past it.)
 - reeval_ideal / lmp_settled / preideal_settled / ideal_settled: open-ended —
   execution is input-driven, not wall-clock driven (spec section 12). They
   never auto-skip on time; deterministic input failures skip them with a
@@ -21,7 +24,7 @@ from app.scheduler.config import SchedulerConfig
 
 UTC = timezone.utc
 
-_WINDOWED_KINDS = ("preideal_daily", "ideal_daily", "reeval_preideal")
+_WINDOWED_KINDS = ("preideal_daily", "ideal_daily")
 
 
 def bogota_tz(tz_name: str) -> tzinfo:
@@ -57,13 +60,17 @@ def window_edges(
 
     Daily kinds act on the day BEFORE target (the D-1 window of spec section
     4). The close instant is 23:59:00 Bogota — a 00:00 boundary would wrongly
-    let the whole next day keep claiming.
+    let the whole next day keep claiming. reeval_preideal opens on D-1 at
+    REEVAL_PREIDEAL_TIME and never closes (see module docstring).
     """
+    if kind == "reeval_preideal":
+        prev = target - timedelta(days=1)
+        open_at = wall_to_utc(prev, config.reeval_preideal_time, config.scheduler_tz)
+        return open_at, None
     if kind not in _WINDOWED_KINDS:
         return None, None
     prev = target - timedelta(days=1)
-    earliest = config.reeval_preideal_time if kind == "reeval_preideal" else config.daily_earliest
-    open_at = wall_to_utc(prev, earliest, config.scheduler_tz)
+    open_at = wall_to_utc(prev, config.daily_earliest, config.scheduler_tz)
     close_at = wall_to_utc(prev, config.daily_deadline, config.scheduler_tz)
     return open_at, close_at
 

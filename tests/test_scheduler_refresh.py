@@ -62,7 +62,9 @@ def _write_year_csv(tmp_path, rel_subdir, filename, df):
 
 def test_refresh_tick_merges_window_and_clears_loader_cache(tmp_path):
     session = _session()
-    # local precio_bolsa ends 04-17; now = 04-20 12:00 UTC -> Bogota 04-20 -> end 04-19
+    # local precio_bolsa ends 04-17; now = 04-20 12:00 UTC -> Bogota 04-20 -> end 04-21
+    # (Bogota tomorrow: the D-1 lanes need rows dated D on D-1, so the request
+    # window reaches through the next Bogota calendar day)
     local = pd.DataFrame(
         {
             "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
@@ -82,13 +84,70 @@ def test_refresh_tick_merges_window_and_clears_loader_cache(tmp_path):
     )
 
     fresh = loaders_mod.load_precio_bolsa(str(tmp_path), 2024)
-    assert fresh["datetime"].dt.date.max() == date(2024, 4, 19)
+    assert fresh["datetime"].dt.date.max() == date(2024, 4, 21)
     assert len(fresh) == 192  # 8 requested days x 24h, no duplicates
 
-    # the pull must have started at min(window edge, last_local+1) = min(04-12, 04-18)
+    # the pull must have started at min(window edge, last_local+1) = min(04-14, 04-18)
     asked = [a for a in consult.asked if a[0] == "PrecBolsNaci"]
-    assert asked and asked[0][1] == date(2024, 4, 12)
-    assert asked[0][2] == date(2024, 4, 19)
+    assert asked and asked[0][1] == date(2024, 4, 14)
+    assert asked[0][2] == date(2024, 4, 21)
+
+
+def test_refresh_tick_requests_through_bogota_tomorrow(tmp_path):
+    """F1: the freshness pull must reach the NEXT Bogota calendar day.
+
+    XM returns only published rows, so requesting through tomorrow is safe —
+    each series' own publication lag governs what arrives. A row of
+    dispo_declarada dated D must be fetchable during D-1's window (the fresh
+    daily lanes run on D-1), which the old "Bogota today - 1" end could never
+    do.
+    """
+    session = _session()
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    # 23:59 UTC == 18:59 Bogota on 04-20 (well inside D-1's window): end must be 04-21
+    now = datetime(2024, 4, 20, 23, 59, tzinfo=UTC)
+    consult = _FakeConsult(date(2024, 4, 14), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    asked = [a for a in consult.asked if a[0] == "PrecBolsNaci"]
+    assert asked and asked[0][2] == date(2024, 4, 21)
+
+
+def test_refresh_tick_pull_start_reaches_last_plus_one_when_local_stale(tmp_path):
+    """Healing reach-back under the tomorrow end day.
+
+    With the request window ending on Bogota tomorrow (04-21), a local file
+    whose rows end before the window edge (04-14) must make the pull start at
+    last_local + 1 (04-13), not at the bare window edge — otherwise the gap
+    between the last local row and the edge would never be re-requested.
+    """
+    session = _session()
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-12", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    now = datetime(2024, 4, 20, 12, 0, tzinfo=UTC)
+    consult = _FakeConsult(date(2024, 4, 13), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+    asked = [a for a in consult.asked if a[0] == "PrecBolsNaci"]
+    assert asked and asked[0][1] == date(2024, 4, 13)  # last_local + 1
+    assert asked[0][2] == date(2024, 4, 21)
+    fresh = loaders_mod.load_precio_bolsa(str(tmp_path), 2024)
+    assert fresh["datetime"].dt.date.max() == date(2024, 4, 21)
 
 
 def test_refresh_tick_gate_creates_settled_rows_when_month_completes(tmp_path):

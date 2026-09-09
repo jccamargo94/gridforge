@@ -9,6 +9,13 @@ starts at min(today - DATA_REFRESH_WINDOW_DAYS, last_local_day + 1), i.e.
 always at least the window back AND reaching back to the day after the last
 locally merged row — the closed month arrives whole on the first pull after
 publication, with no separate monthly job.
+
+The window ENDS on the next Bogota calendar day (post-final-review
+amendment): XM's API returns only published rows, so requesting through
+tomorrow is safe and each series' own publication lag governs what arrives.
+The D-1 fresh lanes need rows dated D on D-1 (dispo_declarada(D) is
+published during D-1), which an end of "Bogota today - 1" could never pull;
+the plan's old "never pulls today" note is superseded by that amendment.
 """
 
 from __future__ import annotations
@@ -66,7 +73,7 @@ def refresh_tick(session, *, now, config, data_dir: str = "data", consult=None) 
     from pydataxm.pydataxm import ReadDB
 
     consult_obj = consult if consult is not None else ReadDB()
-    end_day = timeutil.tz_date(now, config.scheduler_tz) - timedelta(days=1)
+    end_day = timeutil.tz_date(now, config.scheduler_tz) + timedelta(days=1)
 
     needs_crosswalk = any(needs for _, _, needs in _SERIES)
     crosswalk = xm_bulk.fetch_resource_crosswalk(consult_obj) if needs_crosswalk else None

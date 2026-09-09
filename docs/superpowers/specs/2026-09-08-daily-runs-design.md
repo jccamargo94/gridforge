@@ -342,3 +342,29 @@ desplegar apagado y prender después.
 - Home de #90 = series continuas con drill-down; la lista queda solo para
   corridas manuales (m0081/m0083).
 - `/chart/series` v1 = 5 series sin lmp.
+
+## Enmienda 2026-09-09 (fix wave post-revisión final)
+
+Decisiones de la revisión final de la rama, aprobadas por el dueño del spec
+(rama `fase7a/w5-fix-final`; esta enmienda supera la nota de "nunca trae hoy"
+del §5.1):
+
+1. El extremo del pull del freshness tick llega al siguiente día calendario
+   Bogotá: XM solo devuelve filas publicadas, así que el rezago de cada serie
+   gobierna lo que llega, y la fila `dispo_declarada(D)` puede existir local
+   durante la ventana D-1.
+2. El freshness tick precarga los blobs por fecha del día siguiente desde
+   `daily_earliest` (15:00 default): sin eso, el gate de insumos de las
+   corridas frescas D-1 nunca se abre en un despliegue limpio.
+3. Orden de ticks del worker: refresh antes de plan (un claim del mismo pase
+   debe observar filas/blobs ya traídos por ese pase); sweep después de plan;
+   el lane manual queda último, fuera del bloque diario.
+4. `reeval_preideal` pasa a ventana abierta (cierra en None; abre D-1 a
+   `reeval_preideal_time`): evalúa contra el iMAR final cuando corra — el
+   blob iMAR(D) se fuerza-refresca antes de evaluar — y las filas curadas por
+   el sweep quedan funcionales.
+5. Reconciliación al boot del worker de filas `running` huérfanas por crash
+   (asume worker single-process; un reaper por edad queda fuera de alcance
+   para despliegues multi-worker).
+6. `claim_next_pending_run` (lane manual) solo reclama runs con `user_id`: los
+   runs de sistema (`user_id` NULL) se reclaman por id al crearse.

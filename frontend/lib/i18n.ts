@@ -63,6 +63,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.loading": "Cargando serie...",
     "home.empty": "Sin datos de serie todavia.",
     "home.error": "No se pudo cargar la serie.",
+    "home.retry": "Reintentar",
     "home.tx1Lag": "TX1 publica con 2-4 dias de retraso.",
 
     "runDetail.loading": "Cargando detalles...",
@@ -357,6 +358,7 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.loading": "Loading series...",
     "home.empty": "No series data yet.",
     "home.error": "Could not load the series.",
+    "home.retry": "Retry",
     "home.tx1Lag": "TX1 publishes with a 2-4 day lag.",
 
     "runDetail.loading": "Loading run details...",

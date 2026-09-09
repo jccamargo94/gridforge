@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { I18nProvider } from "@/lib/i18n-context";
@@ -93,13 +93,15 @@ describe("handleChartClick", () => {
 });
 
 describe("HomeChart", () => {
-  it("renders five lines for a full window", () => {
+  it("renders five lines for a full window", async () => {
     const { container } = renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
-    expect(container.querySelector(".recharts-wrapper, svg")).toBeTruthy();
+    await waitFor(() =>
+      expect(container.querySelector(".recharts-wrapper, svg")).toBeTruthy()
+    );
     expect(container.querySelectorAll(".recharts-line").length).toBe(5);
   });
 
-  it("renders gaps for null values instead of coercing them to zero", () => {
+  it("renders gaps for null values instead of coercing them to zero", async () => {
     const rows = [
       makeRow({ date: "2024-04-16" }),
       makeRow({
@@ -113,6 +115,9 @@ describe("HomeChart", () => {
       makeRow({ date: "2024-04-18" }),
     ];
     const { container } = renderChart(rows);
+    await waitFor(() =>
+      expect(container.querySelectorAll(".recharts-line-curve").length).toBe(5)
+    );
     const curves = Array.from(
       container.querySelectorAll(".recharts-line-curve")
     );
@@ -127,8 +132,11 @@ describe("HomeChart", () => {
     expect(multiSegment.length).toBe(5);
   });
 
-  it("renders a single continuous path when no values are null", () => {
+  it("renders a single continuous path when no values are null", async () => {
     const { container } = renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
+    await waitFor(() =>
+      expect(container.querySelectorAll(".recharts-line-curve").length).toBe(5)
+    );
     const curves = Array.from(container.querySelectorAll(".recharts-line-curve"));
     expect(curves.length).toBe(5);
     for (const curve of curves) {
@@ -150,7 +158,7 @@ describe("HomeChart", () => {
     expect(screen.getByText(/sin datos de serie todavia/i)).toBeInTheDocument();
   });
 
-  it("renders a partial chart plus caption when only trailing days are null", () => {
+  it("renders a partial chart plus caption when only trailing days are null", async () => {
     const { container } = renderChart([
       makeRow({ date: "2024-04-16" }),
       makeRow({
@@ -162,7 +170,9 @@ describe("HomeChart", () => {
         preideal: null,
       }),
     ]);
-    expect(container.querySelector(".recharts-wrapper, svg")).toBeTruthy();
+    await waitFor(() =>
+      expect(container.querySelector(".recharts-wrapper, svg")).toBeTruthy()
+    );
     expect(screen.queryByText(/sin datos de serie todavia/i)).not.toBeInTheDocument();
     expect(screen.getByText(/retraso/i)).toBeInTheDocument();
   });
@@ -170,7 +180,9 @@ describe("HomeChart", () => {
   it("hides a line when its legend entry is clicked", async () => {
     const user = userEvent.setup();
     const { container } = renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
-    expect(container.querySelectorAll(".recharts-line").length).toBe(5);
+    await waitFor(() =>
+      expect(container.querySelectorAll(".recharts-line").length).toBe(5)
+    );
 
     await user.click(screen.getByRole("button", { name: /bolsa real/i }));
 
@@ -181,10 +193,10 @@ describe("HomeChart", () => {
     expect(container.querySelectorAll(".recharts-line").length).toBe(4);
   });
 
-  it("renders English copy when the locale is en", () => {
+  it("renders English copy when the locale is en", async () => {
     localStorage.setItem("gridforge-lang", "en");
     renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
-    expect(screen.getByRole("button", { name: /real bolsa/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /real bolsa/i })).toBeInTheDocument();
     expect(screen.getByText(/2-4 day lag/i)).toBeInTheDocument();
   });
 });

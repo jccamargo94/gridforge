@@ -3,6 +3,7 @@
 import { CreateRunForm } from "@/components/create-run-form";
 import { RunsTable } from "@/components/runs-table";
 import { listRuns } from "@/lib/api-client";
+import { isManualRun } from "@/lib/run-status";
 import {
   Card,
   CardContent,
@@ -20,7 +21,7 @@ export default function RunsPage() {
   const runsQuery = useQuery({ queryKey: ["runs"], queryFn: listRuns });
   const t = useT();
 
-  const runs = runsQuery.data ?? [];
+  const runs = (runsQuery.data ?? []).filter(isManualRun);
   const totalRuns = runs.length;
   const pendingRuns = runs.filter((r) => r.status === "pending").length;
   const runningRuns = runs.filter((r) => r.status === "running").length;
@@ -84,7 +85,7 @@ export default function RunsPage() {
               <Loader2 className="size-4 animate-spin" />
               {t("runs.loading")}
             </div>
-          ) : runsQuery.data && runsQuery.data.length === 0 ? (
+          ) : runs.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <Zap className="size-10 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">
@@ -95,7 +96,7 @@ export default function RunsPage() {
               </p>
             </div>
           ) : (
-            <RunsTable runs={runsQuery.data ?? []} />
+            <RunsTable runs={runs} />
           )}
         </CardContent>
       </Card>

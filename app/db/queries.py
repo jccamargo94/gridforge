@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, Scenario
+from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, RunPlan, Scenario
 from app.schemas import BessScenario, NodalRunResult, RunResult
 
 
@@ -252,3 +252,77 @@ def list_visible_runs(session: Session, user_id: str) -> list[Run]:
         .order_by(Run.created_at.desc())
     )
     return list(session.scalars(stmt))
+
+
+def create_run_plan(
+    session: Session, *, kind: str, target_date: date_, due_at: datetime
+) -> RunPlan:
+    row = RunPlan(kind=kind, target_date=target_date, due_at=due_at)
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def get_run_plan(session: Session, kind: str, target_date: date_) -> RunPlan | None:
+    stmt = select(RunPlan).where(RunPlan.kind == kind, RunPlan.target_date == target_date)
+    return session.scalars(stmt).first()
+
+
+def list_claimable_plans(session: Session, *, now: datetime, max_attempts: int) -> list[RunPlan]:
+    # finished_at IS NULL excludes terminal failures (marked failed with no
+    # retry scheduled): only pending and retry-scheduled failed plans are
+    # claimable again.
+    stmt = (
+        select(RunPlan)
+        .where(
+            RunPlan.due_at <= now,
+            RunPlan.status.in_(["pending", "failed"]),
+            RunPlan.finished_at.is_(None),
+            or_(RunPlan.status == "pending", RunPlan.attempts < max_attempts),
+        )
+        .order_by(RunPlan.due_at, RunPlan.created_at)
+    )
+    return list(session.scalars(stmt))
+
+
+def mark_plan_done(session: Session, plan: RunPlan, *, run_id: str | None = None) -> None:
+    plan.status = "done"
+    plan.run_id = run_id
+    plan.finished_at = datetime.now(timezone.utc)
+    session.add(plan)
+    session.commit()
+
+
+def mark_plan_failed(
+    session: Session,
+    plan: RunPlan,
+    *,
+    error: str,
+    run_id: str | None = None,
+    retry_at: datetime | None = None,
+) -> None:
+    plan.status = "failed"
+    plan.error = error
+    if run_id is not None:
+        plan.run_id = run_id
+    if retry_at is not None:
+        plan.due_at = retry_at
+    else:
+        plan.finished_at = datetime.now(timezone.utc)
+    session.add(plan)
+    session.commit()
+    if retry_at is not None:
+        # SQLite stores DateTime(timezone=True) without the offset and commit()
+        # reloads the row, so due_at would come back naive. Re-set the in-memory
+        # value so callers comparing against the tz-aware retry instant (repo
+        # pattern: timestamps tz-aware UTC) don't see a bare datetime.
+        plan.due_at = retry_at
+
+
+def mark_plan_skipped(session: Session, plan: RunPlan, *, reason: str) -> None:
+    plan.status = "skipped"
+    plan.error = reason
+    plan.finished_at = datetime.now(timezone.utc)
+    session.add(plan)
+    session.commit()

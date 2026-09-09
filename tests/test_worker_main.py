@@ -84,7 +84,7 @@ def test_process_once_marks_run_failed_when_run_case_reports_failure(tmp_path, m
 
     case = DispatchCase(dispatch_date=FECHA, level=DispatchLevel.preideal, solver="cbc")
     fake_result = RunResult(case=case, ok=False, error="boom")
-    monkeypatch.setattr("services.worker.main.run_case", lambda *a, **kw: fake_result)
+    monkeypatch.setattr("app.scheduler.executor.run_case", lambda *a, **kw: fake_result)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -110,7 +110,7 @@ def test_process_once_marks_run_failed_when_run_case_raises(tmp_path, monkeypatc
     def _raise(*a, **kw):
         raise RuntimeError("solver exploded")
 
-    monkeypatch.setattr("services.worker.main.run_case", _raise)
+    monkeypatch.setattr("app.scheduler.executor.run_case", _raise)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -226,7 +226,7 @@ def test_process_once_captures_messages_emitted_via_logging_not_just_print(tmp_p
         logging.getLogger("egret.fake").warning("dual suffix warning via logging, not print")
         return RunResult(case=case, ok=True)
 
-    monkeypatch.setattr("services.worker.main.run_case", _fake_run_case)
+    monkeypatch.setattr("app.scheduler.executor.run_case", _fake_run_case)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True
@@ -257,7 +257,7 @@ def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, m
             pass
         raise SQLAlchemyError("db exploded")
 
-    monkeypatch.setattr("services.worker.main.run_case", _raise_db_error)
+    monkeypatch.setattr("app.scheduler.executor.run_case", _raise_db_error)
 
     processed = process_once(session, data_dir=DD, results_root=str(tmp_path / "results"))
     assert processed is True

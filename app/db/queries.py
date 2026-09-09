@@ -5,6 +5,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Case, InputDataset, MetricSet, NodalResult, Run, RunPlan, Scenario
+from app.db.series import ingest_run_price_rows
 from app.schemas import BessScenario, NodalRunResult, RunResult
 
 
@@ -124,6 +125,11 @@ def finish_run_ok(
                 evaluated_at=datetime.now(timezone.utc) if reference else None,
             )
         )
+    # REQ-HS-03 (D6 hook): upsert the run's hourly ideal_marginal_price rows
+    # in the same transaction as the finish (before the commit below). The
+    # helper never raises on missing/unreadable price files (B3), so a bad
+    # price_path cannot flip a solved run to failed (executor.py:107-112).
+    ingest_run_price_rows(session, run)
     session.commit()
 
 

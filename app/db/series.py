@@ -22,6 +22,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Sequence
 from zoneinfo import ZoneInfo
 
+import pandas as pd
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -29,7 +30,8 @@ from sqlalchemy.orm import Session
 
 from app.data import loaders
 from app.data.actuals import load_actual_price
-from app.db.models import HourlySeries, TenantMember
+from app.db.models import HourlySeries, Run, TenantMember
+from app.storage import get_storage
 
 UTC = timezone.utc
 BOGOTA = ZoneInfo("America/Bogota")
@@ -181,4 +183,60 @@ def ingest_external_window(
     while day <= end_day:
         rows.extend(_external_day_rows(day, data_dir))
         day += timedelta(days=1)
+    return upsert_hourly_rows(session, rows)
+
+
+def _run_price_rows(run: Run) -> list[tuple[datetime, float]]:
+    """(ts UTC, value COP/MWh) pairs from a run's price CSV. Naive datetimes
+    in the CSV are Bogota wall time (D5); the values are already COP/MWh, so
+    no unit conversion happens here (B4)."""
+    if run.price_path is None:
+        return []
+    try:
+        with get_storage(".").open(run.price_path) as f:
+            frame = pd.read_csv(f, parse_dates=["datetime"])
+    except _SKIP as exc:
+        logger.warning("run ingest: skipping price rows for run %s (%s)", run.id, exc)
+        return []
+    pairs = []
+    for _, raw in frame.iterrows():
+        value = raw["ideal_marginal_price"]
+        if pd.isna(value):
+            continue
+        ts = raw["datetime"]
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=BOGOTA).astimezone(UTC)
+        else:
+            ts = ts.astimezone(UTC)
+        pairs.append((ts, float(value)))
+    return pairs
+
+
+def ingest_run_price_rows(session: Session, run: Run) -> int:
+    """REQ-HS-03: upsert the run's 24 `ideal_marginal_price` hourly rows
+    (source = run id) from its price CSV.
+
+    Tenant attribution (B1): public runs write tenant NULL; private runs
+    write under EVERY tenant the owner belongs to; an owner with zero
+    memberships writes nothing — a private run can never leak public rows.
+    Missing/unreadable price CSVs are skipped (B3): the run stays done.
+    """
+    pairs = _run_price_rows(run)
+    if not pairs:
+        return 0
+    if run.visibility == "public":
+        scopes: list[str | None] = [None]
+    else:
+        scopes = tenant_ids_for_user(session, run.user_id)
+    rows = [
+        HourlySeries(
+            ts=ts,
+            tenant_id=scope,
+            series_key=RUN_SERIES_KEY,
+            value=value,
+            source=run.id,
+        )
+        for scope in scopes
+        for ts, value in pairs
+    ]
     return upsert_hourly_rows(session, rows)

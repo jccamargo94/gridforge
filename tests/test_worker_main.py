@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.db import queries
 from app.db.models import Base, Run
+from app.scheduler.config import SchedulerConfig
 from app.schemas import DispatchCase, DispatchLevel, RunResult
-from services.worker.main import process_once
+from services.worker.main import main_iteration, process_once
 
 DD = str(Path(__file__).parent / "fixtures" / "xm_smoke")
 FECHA = date(2024, 4, 18)
@@ -265,3 +266,54 @@ def test_process_once_marks_run_failed_when_run_case_raises_db_error(tmp_path, m
     updated = queries.get_run(session, run.id)
     assert updated.status == "failed"
     assert updated.error is not None
+
+
+NOW = datetime(2026, 9, 8, 21, 0, tzinfo=timezone.utc)
+
+
+def test_main_iteration_disabled_runs_only_manual_lane(monkeypatch):
+    session = _session()
+    calls = []
+    monkeypatch.setattr("app.scheduler.tick.plan_tick", lambda *a, **kw: calls.append("plan"))
+    monkeypatch.setattr(
+        "app.scheduler.refresh.refresh_tick", lambda *a, **kw: calls.append("refresh")
+    )
+    monkeypatch.setattr(
+        "app.scheduler.plans.sweep_create_rows", lambda *a, **kw: calls.append("sweep")
+    )
+    monkeypatch.setattr(
+        "services.worker.main.process_once", lambda *a, **kw: calls.append("manual")
+    )
+
+    config = SchedulerConfig(daily_enabled=False)
+    main_iteration(session, now=NOW, config=config)
+    assert calls == ["manual"]
+
+
+def test_main_iteration_runs_plan_tick_and_manual_lane(monkeypatch):
+    session = _session()
+    calls = []
+    monkeypatch.setattr("app.scheduler.tick.plan_tick", lambda *a, **kw: calls.append("plan"))
+    monkeypatch.setattr(
+        "app.scheduler.refresh.refresh_tick", lambda *a, **kw: calls.append("refresh")
+    )
+    monkeypatch.setattr(
+        "app.scheduler.plans.sweep_create_rows", lambda *a, **kw: calls.append("sweep")
+    )
+    monkeypatch.setattr(
+        "services.worker.main.process_once", lambda *a, **kw: calls.append("manual")
+    )
+
+    config = SchedulerConfig(daily_enabled=True)
+    state = main_iteration(session, now=NOW, config=config)
+    # first pass: every tick deadline starts at 0.0 -> plan + refresh fire;
+    # sweep: 21:00 UTC == 16:00 Bogota >= 05:30 -> fires; manual lane runs once
+    assert calls == ["plan", "refresh", "sweep", "manual"]
+    assert state.last_sweep_date == date(2026, 9, 8)
+    assert state.plan_next > 0
+
+    # second immediate pass: plan tick not due again (60 s), refresh not due
+    # (3600 s), sweep already done today -> manual lane only
+    calls.clear()
+    main_iteration(session, state=state, now=NOW, config=config)
+    assert calls == ["manual"]

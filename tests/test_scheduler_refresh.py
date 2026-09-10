@@ -61,6 +61,17 @@ def _write_year_csv(tmp_path, rel_subdir, filename, df):
     df.to_csv(sub / filename, index=False, date_format="%Y-%m-%d %H:%M:%S")
 
 
+class _FakeConsultOfertasEmpty(_FakeConsult):
+    """PrecOferDesp answers empty (monthly block not yet published); every
+    other collection answers normally."""
+
+    def request_data(self, coleccion, metrica, start_date, end_date):
+        if coleccion == "PrecOferDesp":
+            self.asked.append((coleccion, start_date, end_date))
+            return pd.DataFrame()
+        return super().request_data(coleccion, metrica, start_date, end_date)
+
+
 def test_refresh_tick_merges_window_and_clears_loader_cache(tmp_path):
     session = _session()
     # local precio_bolsa ends 04-17; now = 04-20 12:00 UTC -> Bogota 04-20 -> end 04-21
@@ -439,6 +450,34 @@ def test_refresh_tick_ingest_skips_days_without_sources(tmp_path, monkeypatch):
     assert rows, "tick must ingest bolsa rows from the freshly merged CSV"
     assert all(r.tenant_id is None for r in rows)
     assert all(r.value == 300000.0 for r in rows if r.series_key == "bolsa_tx1")
+
+
+def test_refresh_tick_survives_empty_ofertas_and_refreshes_other_series(tmp_path):
+    """An unpublished PrecOferDesp monthly block (empty 0,0 payload) must not
+    abort the tick: the series after ofertas in _SERIES still refresh."""
+    session = _session()
+    local = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-17", periods=24, freq="h"),
+            "precio_bolsa": [200.0] * 24,
+        }
+    )
+    _write_year_csv(tmp_path, "precio_bolsa", "precio_bolsa_2024.csv", local)
+
+    now = datetime(2024, 4, 20, 12, 0, tzinfo=UTC)
+    consult = _FakeConsultOfertasEmpty(date(2024, 4, 14), date(2024, 4, 21))
+    refresh_mod.refresh_tick(
+        session, now=now, config=CONFIG, data_dir=str(tmp_path), consult=consult
+    )
+
+    # ofertas was a no-op (no CSV invented) ...
+    assert not (tmp_path / "ofertas" / "ofertas_2024.csv").exists()
+    # ... while every other series in the loop refreshed
+    assert (tmp_path / "dispo_declarada" / "dispo_declarada_2024.csv").exists()
+    assert (tmp_path / "demaCome" / "demaCome_2024.csv").exists()
+    assert (tmp_path / "dispo_come" / "dispo_come_2024.csv").exists()
+    fresh = loaders_mod.load_precio_bolsa(str(tmp_path), 2024)
+    assert fresh["datetime"].dt.date.max() == date(2024, 4, 21)
 
 
 def _boom(*args, **kwargs):

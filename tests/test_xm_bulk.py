@@ -12,6 +12,7 @@ from app.data.xm_bulk import (
     ensure_ofertas,
     ensure_precio_bolsa,
     fetch_resource_crosswalk,
+    refresh_ofertas,
 )
 from app.storage import LocalStorage
 
@@ -146,6 +147,38 @@ def test_ensure_ofertas_is_noop_when_partition_exists(tmp_path):
 
     consult = type("C", (), {"request_data": _boom})()
     ensure_ofertas(2024, str(tmp_path), consult, _CROSSWALK)
+
+
+class _FakeConsultOfertasEmpty:
+    """XM returns an empty (0,0) payload while PrecOferDesp's monthly block is
+    unpublished (it is published ~1st of the following month)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def request_data(self, coleccion, metrica, start_date, end_date):
+        self.calls.append((coleccion, metrica, start_date, end_date))
+        return pd.DataFrame()
+
+
+def test_refresh_ofertas_empty_response_is_noop(tmp_path):
+    consult = _FakeConsultOfertasEmpty()
+    refresh_ofertas(date(2024, 4, 18), date(2024, 4, 18), str(tmp_path), consult, _CROSSWALK)
+
+    assert consult.calls == [("PrecOferDesp", "Recurso", date(2024, 4, 18), date(2024, 4, 18))]
+    assert not (tmp_path / "ofertas" / "ofertas_2024.csv").exists()
+
+
+def test_refresh_ofertas_empty_response_keeps_existing_csv(tmp_path):
+    sub = tmp_path / "ofertas"
+    sub.mkdir()
+    csv_path = sub / "ofertas_2024.csv"
+    csv_path.write_text("Date,resource_name,Value\n2024-04-17,SALTO II,150.0\n")
+
+    consult = _FakeConsultOfertasEmpty()
+    refresh_ofertas(date(2024, 4, 18), date(2024, 4, 18), str(tmp_path), consult, _CROSSWALK)
+
+    assert csv_path.read_text() == "Date,resource_name,Value\n2024-04-17,SALTO II,150.0\n"
 
 
 class _FakeConsultSistema:

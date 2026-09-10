@@ -187,6 +187,11 @@ def refresh_ofertas(start, end, data_dir, consult, crosswalk, session=None) -> N
     storage = get_storage(data_dir)
     rel_path = f"ofertas/ofertas_{start.year}.csv"
     raw = consult.request_data("PrecOferDesp", "Recurso", start, end)
+    # XM publishes PrecOferDesp as a monthly block (~1st of the following
+    # month): a window still inside the unpublished period comes back empty
+    # (0,0). Nothing to merge; leave the local CSV untouched.
+    if raw.empty:
+        return
     daily = raw.rename(columns={"Values_code": "code", "Values_Hour01": "Value"})
     daily = daily[["code", "Date", "Value"]]
     fresh = daily.merge(crosswalk, on="code", how="inner")[["Date", "resource_name", "Value"]]

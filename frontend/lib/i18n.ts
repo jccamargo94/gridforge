@@ -65,6 +65,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.error": "No se pudo cargar la serie.",
     "home.retry": "Reintentar",
     "home.tx1Lag": "TX1 publica con 2-4 dias de retraso.",
+    "home.hourly": "Detalle horario",
+    "home.hourlyEmpty": "Sin detalle horario para este dia.",
+    "home.viewRun": "Ver run",
+    "home.close": "Cerrar",
 
     "runDetail.loading": "Cargando detalles...",
     "runDetail.dispatchChart": "Despacho por generador",
@@ -360,6 +364,10 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.error": "Could not load the series.",
     "home.retry": "Retry",
     "home.tx1Lag": "TX1 publishes with a 2-4 day lag.",
+    "home.hourly": "Hourly detail",
+    "home.hourlyEmpty": "No hourly detail for this day.",
+    "home.viewRun": "View run",
+    "home.close": "Close",
 
     "runDetail.loading": "Loading run details...",
     "runDetail.dispatchChart": "Dispatch by Generator",

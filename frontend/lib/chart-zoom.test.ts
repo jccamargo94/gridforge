@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampWindow,
   fullWindow,
+  isDragGesture,
   isWindowFull,
   panRange,
   windowSpan,
@@ -71,5 +73,47 @@ describe("panRange", () => {
 
   it("cannot move a full window", () => {
     expect(panRange(fullWindow(24), 5, TOTAL)).toEqual(fullWindow(24));
+  });
+});
+
+describe("clampWindow", () => {
+  it("normalizes an inverted range", () => {
+    expect(clampWindow({ start: 8, end: 3 }, TOTAL, MIN)).toEqual({ start: 3, end: 8 });
+  });
+
+  it("clamps indexes to the data bounds", () => {
+    expect(clampWindow({ start: -5, end: 99 }, TOTAL, MIN)).toEqual({ start: 0, end: 23 });
+  });
+
+  it("enforces the minimum window around the selection", () => {
+    expect(clampWindow({ start: 10, end: 11 }, TOTAL, MIN)).toEqual({ start: 10, end: 13 });
+    expect(clampWindow({ start: 22, end: 23 }, TOTAL, MIN)).toEqual({ start: 20, end: 23 });
+  });
+
+  it("accepts any range when the data is smaller than the minimum", () => {
+    expect(clampWindow({ start: 0, end: 2 }, 3, MIN)).toEqual({ start: 0, end: 2 });
+  });
+
+  it("handles empty data", () => {
+    expect(clampWindow({ start: 0, end: 0 }, 0, MIN)).toEqual({ start: 0, end: 0 });
+  });
+});
+
+describe("isDragGesture", () => {
+  it("is false without a press origin", () => {
+    expect(isDragGesture(null, { x: 100, y: 100 })).toBe(false);
+  });
+
+  it("is false for a click that barely moves", () => {
+    expect(isDragGesture({ x: 100, y: 100 }, { x: 102, y: 101 })).toBe(false);
+  });
+
+  it("is true when the pointer moved past the threshold", () => {
+    expect(isDragGesture({ x: 100, y: 100 }, { x: 140, y: 100 })).toBe(true);
+  });
+
+  it("honors a custom threshold", () => {
+    expect(isDragGesture({ x: 100, y: 100 }, { x: 106, y: 100 }, 5)).toBe(true);
+    expect(isDragGesture({ x: 100, y: 100 }, { x: 104, y: 100 }, 5)).toBe(false);
   });
 });

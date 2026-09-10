@@ -13,6 +13,11 @@ export interface ChartSeriesRow {
   ideal_provisional_run_id: string | null;
   preideal: number | null;
   preideal_run_id: string | null;
+  bolsa_tx1_hourly: (number | null)[];
+  mpo_xm_hourly: (number | null)[];
+  ideal_settled_hourly: (number | null)[];
+  ideal_provisional_hourly: (number | null)[];
+  preideal_hourly: (number | null)[];
 }
 
 export interface RunSummary {

@@ -26,6 +26,11 @@ const ROWS: ChartSeriesRow[] = [
     ideal_provisional_run_id: null,
     preideal: null,
     preideal_run_id: null,
+    bolsa_tx1_hourly: Array.from({ length: 24 }, () => null),
+    mpo_xm_hourly: Array.from({ length: 24 }, () => null),
+    ideal_settled_hourly: Array.from({ length: 24 }, () => null),
+    ideal_provisional_hourly: Array.from({ length: 24 }, () => null),
+    preideal_hourly: Array.from({ length: 24 }, () => null),
   },
 ];
 

@@ -3,12 +3,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { I18nProvider } from "@/lib/i18n-context";
 import type { ChartSeriesRow } from "@/lib/types";
-import { HomeChart, HomeChartTooltip, bestRunId, handleChartClick } from "./home-chart";
+import {
+  HomeChart,
+  HomeChartTooltip,
+  bestRunId,
+  nextSelectedDate,
+  viewRunHref,
+} from "./home-chart";
+import { HomeHourlyPanel } from "./home-hourly-panel";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
+
+function hourly(overrides: Record<number, number> = {}): (number | null)[] {
+  return Array.from({ length: 24 }, (_, hour) => overrides[hour] ?? null);
+}
 
 function makeRow(overrides: Partial<ChartSeriesRow>): ChartSeriesRow {
   return {
@@ -21,6 +32,11 @@ function makeRow(overrides: Partial<ChartSeriesRow>): ChartSeriesRow {
     ideal_provisional_run_id: "run-prov",
     preideal: 3000,
     preideal_run_id: "run-pre",
+    bolsa_tx1_hourly: hourly({ 0: 190000, 12: 210000 }),
+    mpo_xm_hourly: hourly({ 0: 140000, 12: 160000 }),
+    ideal_settled_hourly: hourly({ 0: 900, 12: 1100 }),
+    ideal_provisional_hourly: hourly({ 0: 1900, 12: 2100 }),
+    preideal_hourly: hourly({ 0: 2900, 12: 3100 }),
     ...overrides,
   };
 }
@@ -31,6 +47,27 @@ function renderChart(rows: ChartSeriesRow[] | null) {
       <HomeChart rows={rows} />
     </I18nProvider>
   );
+}
+
+function renderPanel(overrides: Partial<Parameters<typeof HomeHourlyPanel>[0]> = {}) {
+  const onClose = vi.fn();
+  const onViewRun = vi.fn();
+  const result = render(
+    <I18nProvider>
+      <HomeHourlyPanel
+        row={makeRow({})}
+        series={[
+          { key: "bolsa_tx1", name: "Bolsa real (TX1)", color: "#22c55e" },
+          { key: "mpo_xm", name: "MPO XM (iMAR)", color: "#f59e0b" },
+        ]}
+        canViewRun
+        onClose={onClose}
+        onViewRun={onViewRun}
+        {...overrides}
+      />
+    </I18nProvider>
+  );
+  return { ...result, onClose, onViewRun };
 }
 
 afterEach(() => {
@@ -65,30 +102,41 @@ describe("bestRunId", () => {
   });
 });
 
-describe("handleChartClick", () => {
-  const rows = [
-    makeRow({ date: "2024-04-18" }),
-    makeRow({
-      date: "2024-04-19",
-      ideal_settled_run_id: null,
-      ideal_provisional_run_id: null,
-      preideal_run_id: null,
-    }),
-  ];
-
-  it("navigates to the best run of the clicked day", () => {
-    handleChartClick(rows, "2024-04-18", push);
-    expect(push).toHaveBeenCalledWith("/runs/run-settled");
+describe("viewRunHref", () => {
+  it("targets the best run of the day", () => {
+    expect(viewRunHref(makeRow({}))).toBe("/runs/run-settled");
+    expect(viewRunHref(makeRow({ ideal_settled_run_id: null }))).toBe("/runs/run-prov");
   });
 
-  it("does not navigate when the day has no runs", () => {
-    handleChartClick(rows, "2024-04-19", push);
-    expect(push).not.toHaveBeenCalled();
+  it("returns null when the day has no runs", () => {
+    expect(
+      viewRunHref(
+        makeRow({
+          ideal_settled_run_id: null,
+          ideal_provisional_run_id: null,
+          preideal_run_id: null,
+        })
+      )
+    ).toBeNull();
+  });
+});
+
+describe("nextSelectedDate", () => {
+  it("selects the clicked day", () => {
+    expect(nextSelectedDate(null, "2024-04-18")).toBe("2024-04-18");
   });
 
-  it("does not navigate without an active day", () => {
-    handleChartClick(rows, undefined, push);
-    expect(push).not.toHaveBeenCalled();
+  it("moves the selection to another day", () => {
+    expect(nextSelectedDate("2024-04-18", "2024-04-19")).toBe("2024-04-19");
+  });
+
+  it("closes the selection when the same day is clicked again", () => {
+    expect(nextSelectedDate("2024-04-18", "2024-04-18")).toBeNull();
+  });
+
+  it("keeps the current selection on a click without an active day", () => {
+    expect(nextSelectedDate(null, undefined)).toBeNull();
+    expect(nextSelectedDate("2024-04-18", undefined)).toBe("2024-04-18");
   });
 });
 
@@ -199,6 +247,11 @@ describe("HomeChart", () => {
     expect(await screen.findByRole("button", { name: /real bolsa/i })).toBeInTheDocument();
     expect(screen.getByText(/2-4 day lag/i)).toBeInTheDocument();
   });
+
+  it("does not open the hourly panel before a day is clicked", async () => {
+    renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
+    expect(screen.queryByRole("heading", { name: /detalle horario/i })).not.toBeInTheDocument();
+  });
 });
 
 describe("HomeChartTooltip", () => {
@@ -229,5 +282,52 @@ describe("HomeChartTooltip", () => {
       </I18nProvider>
     );
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("HomeHourlyPanel", () => {
+  it("renders one line per visible series for the selected day", async () => {
+    const { container } = renderPanel();
+
+    expect(screen.getByRole("heading", { name: /detalle horario/i })).toBeInTheDocument();
+    expect(screen.getByText("2024-04-18")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(container.querySelectorAll(".recharts-line").length).toBe(2)
+    );
+  });
+
+  it("navigates through the explicit view-run action", async () => {
+    const user = userEvent.setup();
+    const { onViewRun } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: /ver run/i }));
+
+    expect(onViewRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the view-run action when the day has no runs", () => {
+    renderPanel({ canViewRun: false });
+
+    expect(screen.queryByRole("button", { name: /ver run/i })).not.toBeInTheDocument();
+  });
+
+  it("closes through the close action", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderPanel();
+
+    await user.click(screen.getByRole("button", { name: /cerrar/i }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an empty message when every visible hour is null", () => {
+    renderPanel({
+      row: makeRow({
+        bolsa_tx1_hourly: hourly(),
+        mpo_xm_hourly: hourly(),
+      }),
+    });
+
+    expect(screen.getByText(/sin detalle horario/i)).toBeInTheDocument();
   });
 });

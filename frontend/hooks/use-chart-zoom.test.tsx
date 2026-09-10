@@ -5,14 +5,37 @@ import { useChartZoom } from "./use-chart-zoom";
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function ZoomHarness({ data }: { data: number[] }) {
-  const { wrapperRef, visibleData, isZoomed, reset, getWrapperProps } = useChartZoom(data);
+  const { wrapperRef, visibleData, window, isZoomed, reset, setWindow, getWrapperProps } =
+    useChartZoom(data);
   return (
     <div ref={wrapperRef} {...getWrapperProps()}>
       <span data-testid="count">{visibleData.length}</span>
+      <span data-testid="window">{`${window.start}-${window.end}`}</span>
       <span data-testid="zoomed">{String(isZoomed)}</span>
+      <button type="button" onClick={() => setWindow({ start: 10, end: 11 })}>
+        range
+      </button>
       <button type="button" onClick={reset}>
         reset
       </button>
+    </div>
+  );
+}
+
+function GuardHarness({ data }: { data: number[] }) {
+  const { wrapperRef, window, visibleData, getWrapperProps } = useChartZoom(data);
+  return (
+    <div
+      ref={wrapperRef}
+      {...getWrapperProps(
+        (target) => target instanceof Element && target.closest(".recharts-brush") != null
+      )}
+    >
+      <span data-testid="count">{visibleData.length}</span>
+      <span data-testid="window">{`${window.start}-${window.end}`}</span>
+      <div data-testid="brush" className="recharts-brush">
+        <span>brush area</span>
+      </div>
     </div>
   );
 }
@@ -97,5 +120,40 @@ describe("useChartZoom", () => {
 
     expect(Number(screen.getByTestId("count").textContent)).toBe(before);
     expect(screen.getByTestId("zoomed")).toHaveTextContent("true");
+  });
+
+  it("exposes the window and clamps an external range to the minimum span", () => {
+    render(<ZoomHarness data={HOURS} />);
+    fireEvent.click(screen.getByText("range"));
+
+    expect(screen.getByTestId("window")).toHaveTextContent("10-13");
+    expect(screen.getByTestId("count")).toHaveTextContent("4");
+    expect(screen.getByTestId("zoomed")).toHaveTextContent("true");
+  });
+
+  it("ignores pan presses that start inside a blocked target", () => {
+    render(<GuardHarness data={HOURS} />);
+    const wrapper = screen.getByTestId("count").parentElement!;
+    mockWidth(wrapper);
+    fireEvent.wheel(wrapper, { deltaY: -100, clientX: 400 });
+    const zoomedWindow = screen.getByTestId("window").textContent;
+
+    fireEvent.mouseDown(screen.getByText("brush area"), { clientX: 100 });
+    fireEvent.mouseMove(wrapper, { clientX: 300 });
+
+    expect(screen.getByTestId("window")).toHaveTextContent(zoomedWindow!);
+  });
+
+  it("still pans when the press starts outside the blocked target", () => {
+    render(<GuardHarness data={HOURS} />);
+    const wrapper = screen.getByTestId("count").parentElement!;
+    mockWidth(wrapper);
+    fireEvent.wheel(wrapper, { deltaY: -100, clientX: 400 });
+    const before = screen.getByTestId("window").textContent;
+
+    fireEvent.mouseDown(wrapper, { clientX: 100 });
+    fireEvent.mouseMove(wrapper, { clientX: 300 });
+
+    expect(screen.getByTestId("window")).not.toHaveTextContent(before!);
   });
 });

@@ -20,6 +20,48 @@ export function clampIndex(value: number, min: number, max: number): number {
 }
 
 /**
+ * Normalize a window coming from an external control (e.g. a Brush drag):
+ * order start <= end, clamp to the data bounds and enforce the minimum span.
+ */
+export function clampWindow(
+  window: ChartZoomWindow,
+  total: number,
+  minWindow = 1
+): ChartZoomWindow {
+  if (total <= 1) return fullWindow(total);
+
+  const minSpan = Math.min(Math.max(1, minWindow), total);
+  let start = clampIndex(Math.min(window.start, window.end), 0, total - 1);
+  let end = clampIndex(Math.max(window.start, window.end), 0, total - 1);
+
+  if (end - start + 1 < minSpan) {
+    end = Math.min(total - 1, start + minSpan - 1);
+    start = Math.max(0, end - minSpan + 1);
+  }
+
+  return { start, end };
+}
+
+export interface PointerPosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * A pointer that moved more than `threshold` pixels between press and release
+ * is a pan gesture, not a click; charts use this to ignore accidental clicks
+ * at the end of a drag.
+ */
+export function isDragGesture(
+  start: PointerPosition | null,
+  end: PointerPosition,
+  threshold = 4
+): boolean {
+  if (start === null) return false;
+  return Math.hypot(end.x - start.x, end.y - start.y) > threshold;
+}
+
+/**
  * Zoom a window around the point located at `focusRatio` (0..1 across the full
  * data). `factor < 1` zooms in (window shrinks), `factor > 1` zooms out.
  */

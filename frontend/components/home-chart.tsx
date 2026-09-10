@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Brush,
   CartesianGrid,
   Line,
   LineChart,
@@ -13,9 +14,12 @@ import {
 } from "recharts";
 import { Zap } from "lucide-react";
 import { ChartLegend } from "@/components/chart-legend";
+import { HomeHourlyPanel } from "@/components/home-hourly-panel";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
 import { useT } from "@/lib/i18n-context";
 import { formatNumber } from "@/lib/chart-format";
+import { isDragGesture } from "@/lib/chart-zoom";
+import type { HourlySeriesKey } from "@/lib/home-hourly";
 import type { ChartSeriesRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +29,11 @@ const SERIES = [
   { key: "ideal_settled", labelKey: "home.idealSettled", color: "#3b82f6" },
   { key: "ideal_provisional", labelKey: "home.idealProv", color: "#38bdf8" },
   { key: "preideal", labelKey: "home.preideal", color: "#a78bfa" },
-] as const;
+] as const satisfies readonly {
+  key: HourlySeriesKey;
+  labelKey: string;
+  color: string;
+}[];
 
 type SeriesKey = (typeof SERIES)[number]["key"];
 
@@ -39,15 +47,20 @@ export function bestRunId(row: ChartSeriesRow): string | null {
   );
 }
 
-export function handleChartClick(
-  rows: ChartSeriesRow[],
-  activeLabel: string | number | undefined,
-  push: (href: string) => void
-): void {
-  if (activeLabel === undefined) return;
-  const row = rows.find((r) => r.date === String(activeLabel));
-  const id = row ? bestRunId(row) : null;
-  if (id !== null) push(`/runs/${id}`);
+export function viewRunHref(row: ChartSeriesRow): string | null {
+  const id = bestRunId(row);
+  return id === null ? null : `/runs/${id}`;
+}
+
+// Clicking the already selected day closes the hourly panel; any other day
+// opens it (or moves it). A click outside a data point keeps the selection.
+export function nextSelectedDate(
+  current: string | null,
+  activeLabel: string | number | undefined
+): string | null {
+  if (activeLabel === undefined) return current;
+  const date = String(activeLabel);
+  return current === date ? null : date;
 }
 
 function isEmptyWindow(rows: ChartSeriesRow[]): boolean {
@@ -107,9 +120,31 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
   const t = useT();
   const router = useRouter();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pressRef = useRef<{ x: number; y: number } | null>(null);
 
   const data = rows ?? [];
-  const { wrapperRef, visibleData, isZoomed, reset, getWrapperProps } = useChartZoom(data);
+  const {
+    wrapperRef,
+    window: zoomWindow,
+    isZoomed,
+    reset,
+    setWindow,
+    getWrapperProps,
+  } = useChartZoom(data);
+
+  // Clicking outside the whole Home chart block releases the pinned day.
+  useEffect(() => {
+    if (selectedDate === null) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && rootRef.current?.contains(target)) return;
+      setSelectedDate(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [selectedDate]);
 
   const toggleSeries = (key: string) => {
     setHidden((prev) => {
@@ -123,6 +158,11 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
     });
   };
 
+  const selectedRow =
+    selectedDate === null ? null : (data.find((row) => row.date === selectedDate) ?? null);
+  const visibleSeries = SERIES.filter((s) => !hidden.has(s.key));
+  const runHref = selectedRow === null ? null : viewRunHref(selectedRow);
+
   const legendItems = SERIES.map((s) => ({
     key: s.key,
     name: t(s.labelKey),
@@ -132,7 +172,7 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
   const empty = isEmptyWindow(data);
 
   return (
-    <div>
+    <div ref={rootRef}>
       {empty ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <Zap className="size-10 text-muted-foreground/40" />
@@ -140,8 +180,20 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
         </div>
       ) : (
         <div
-          {...getWrapperProps()}
+          {...getWrapperProps(
+            (target) => target instanceof Element && target.closest(".recharts-brush") != null
+          )}
           ref={wrapperRef}
+          onPointerDown={(event) => {
+            pressRef.current = { x: event.clientX, y: event.clientY };
+          }}
+          onClickCapture={(event) => {
+            const target = event.target;
+            const onBrush = target instanceof Element && target.closest(".recharts-brush") != null;
+            if (onBrush || isDragGesture(pressRef.current, { x: event.clientX, y: event.clientY })) {
+              event.stopPropagation();
+            }
+          }}
           title={t("chart.zoomHint")}
           className={cn(
             "w-full",
@@ -151,13 +203,11 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
         >
           <ResponsiveContainer width="100%" height={320}>
             <LineChart
-              data={visibleData}
+              data={data}
               margin={{ top: 8, right: 16, left: 8, bottom: 32 }}
-              onClick={(state) =>
-                handleChartClick(rows ?? [], state.activeLabel, (href) => {
-                  router.push(href);
-                })
-              }
+              onClick={(state) => {
+                setSelectedDate((current) => nextSelectedDate(current, state.activeLabel));
+              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis
@@ -179,7 +229,11 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
                   fill: "#a1a1aa",
                 }}
               />
-              <Tooltip content={<HomeChartTooltip unit={t("runDetail.copMwh")} />} />
+              <Tooltip
+                trigger={selectedDate === null ? "hover" : "click"}
+                content={<HomeChartTooltip unit={t("runDetail.copMwh")} />}
+                cursor={{ stroke: "rgba(255,255,255,0.25)", strokeDasharray: "3 3" }}
+              />
               {SERIES.map((s) => (
                 <Line
                   key={s.key}
@@ -192,6 +246,19 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
                   hide={hidden.has(s.key)}
                 />
               ))}
+              <Brush
+                dataKey="date"
+                height={32}
+                travellerWidth={8}
+                stroke="#52525b"
+                fill="#18181b"
+                tickFormatter={(value) => String(value).slice(5)}
+                startIndex={zoomWindow.start}
+                endIndex={zoomWindow.end}
+                onChange={({ startIndex, endIndex }) =>
+                  setWindow({ start: startIndex, end: endIndex })
+                }
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -209,6 +276,21 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
         </div>
       )}
       {!empty && <ChartLegend items={legendItems} hidden={hidden} onToggle={toggleSeries} />}
+      {selectedRow !== null && (
+        <HomeHourlyPanel
+          row={selectedRow}
+          series={visibleSeries.map((s) => ({
+            key: s.key,
+            name: t(s.labelKey),
+            color: s.color,
+          }))}
+          canViewRun={runHref !== null}
+          onClose={() => setSelectedDate(null)}
+          onViewRun={() => {
+            if (runHref !== null) router.push(runHref);
+          }}
+        />
+      )}
       <p className="mt-2 text-xs text-muted-foreground">{t("home.tx1Lag")}</p>
     </div>
   );

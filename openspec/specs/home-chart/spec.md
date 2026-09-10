@@ -2,11 +2,11 @@
 
 ## Proposito
 
-Home chart-first en `/`: serie diaria de precios (TX1, MPO XM, ideal liquidado/provisional, preideal) con drill-down a `/runs/[id]`. El backend `GET /chart/series` ya no esta "dado y congelado": desde time-series-db sirve el contrato diario existente (9 claves por dia, `days` 1..90, default 30) derivado de la tabla `hourly_series` y expone valores horarios (REQ-HC-01, REQ-HC-02). Los requirements de frontend de este spec (issue #90) permanecen vigentes.
+Home chart-first en `/`: serie diaria de precios (TX1, MPO XM, ideal liquidado/provisional, preideal) con seleccion de dia, panel inline de detalle horario, zoom por rango (Brush) y tooltip fijable; la navegacion a `/runs/[id]` es explicita desde el panel. El backend `GET /chart/series` sirve el contrato diario (9 claves por dia, `days` 1..90, default 30) y los 5 arrays horarios (24 posiciones, `null` en gaps) derivados de la tabla `hourly_series` (REQ-HC-01, REQ-HC-02). Los requirements de frontend de este spec (issue #90) permanecen vigentes.
 
 ## No objetivos
 
-LMP, overlay horario en la UI, agregacion semanal, nueva vista de detalle, nav movil, acceso anonimo. Ya no aplica el no-objetivo "cambio backend": time-series-db modifico `GET /chart/series` (REQ-HC-01, REQ-HC-02) manteniendo el contrato diario; el visual del Home no cambia en este cambio. `PriceSeriesChart` NO se reutiliza (dominio hora); solo sus patrones.
+LMP, agregacion semanal, nueva vista de detalle, nav movil, acceso anonimo. `PriceSeriesChart` NO se reutiliza (dominio hora); solo sus patrones. El overlay horario deja de ser no-objetivo: se sirve en un panel inline del Home (ver requirement de detalle horario). Ya no aplica el no-objetivo "cambio backend": time-series-db modifico `GET /chart/series` (REQ-HC-01, REQ-HC-02) manteniendo el contrato diario.
 
 ## Requirements
 
@@ -74,21 +74,93 @@ El sistema MUST mostrar carga (`home.loading`), vacio (`home.empty`) solo si tod
 - WHEN resuelve la consulta
 - THEN muestra `home.error` en `role="alert"` con reintento
 
-### Requirement: Drill-down por dia al mejor run
+### Requirement: Drill-down explicito al mejor run del dia
 
-El sistema MUST navegar con click al mejor `*_run_id` del dia hacia `/runs/[id]` con prioridad `ideal_settled` > `ideal_provisional` > `preideal`; dia sin ids MUST NOT navegar. Asimetria backend: `preideal` es carril unico (settled gana; el provisional se vuelve inalcanzable).
+El sistema MUST seleccionar el dia al hacer click en la grafica (sin navegar) y MUST navegar a `/runs/[id]` solo desde la accion explicita "ver run" del panel horario, usando el mejor `*_run_id` del dia con prioridad `ideal_settled` > `ideal_provisional` > `preideal`; un dia sin ids MUST NOT ofrecer la accion. Asimetria backend: `preideal` es carril unico (settled gana; el provisional se vuelve inalcanzable).
 
 #### Scenario: Dia con ideal liquidado
 
 - GIVEN fila con `ideal_settled_run_id` e `ideal_provisional_run_id`
-- WHEN click en el dia
+- WHEN el usuario abre el panel del dia y activa "ver run"
 - THEN `router.push("/runs/<ideal_settled_run_id>")`
 
 #### Scenario: Dia sin runs
 
 - GIVEN fila con los tres `*_run_id` en `null`
-- WHEN click en el dia
-- THEN no navega (tooltip sin enlace)
+- WHEN el usuario abre el panel del dia
+- THEN no ve la accion "ver run" y no navega
+
+### Requirement: Detalle horario del dia en panel inline
+
+El sistema MUST abrir un panel inline debajo de la grafica al seleccionar un dia, con hasta 24 puntos horarios (hora Bogota) por cada serie visible (estado `hidden` de la leyenda respetado). Todo `null` horario MUST ser gap, nunca cero. El panel MUST poder cerrarse (accion de cierre o segundo click en el mismo dia) y cambiar de dia (click en otro dia). Si no hay ningun valor horario visible, MUST mostrar un mensaje de vacio en lugar de una grafica rota.
+
+#### Scenario: Dia con detalle horario
+
+- GIVEN fila con `*_hourly` de 24 posiciones
+- WHEN se selecciona el dia
+- THEN el panel dibuja 24 puntos por serie visible y respeta los `null` como gaps
+
+#### Scenario: Serie oculta en la leyenda
+
+- GIVEN una serie oculta con `hidden`
+- WHEN se abre el panel
+- THEN esa serie no aparece en el detalle horario
+
+#### Scenario: Panel sin datos horarios
+
+- GIVEN un dia cuyos `*_hourly` visibles son todos `null`
+- WHEN se abre el panel
+- THEN muestra el mensaje de vacio horario, no una grafica vacia
+
+#### Scenario: Cierre del panel
+
+- GIVEN panel abierto
+- WHEN el usuario activa cerrar o hace click de nuevo en el mismo dia
+- THEN el panel se oculta y el dia queda sin seleccion
+
+### Requirement: Zoom por rango con Brush sincronizado
+
+El sistema MUST ofrecer un `Brush` de recharts que lea y escriba el mismo rango visible que la rueda y el pan; arrastrar el Brush MUST actualizar la ventana visible, la rueda y el pan MUST reflejarse en el Brush, y el doble click MUST restablecer la ventana completa. La ventana MUST respetar el minimo de 4 puntos. Las interacciones del Brush MUST NOT disparar el pan del wrapper ni seleccionar dias.
+
+#### Scenario: Arrastrar el Brush
+
+- GIVEN ventana completa de la serie
+- WHEN el usuario arrastra el Brush a un subrango
+- THEN la grafica muestra ese subrango y `isZoomed` es verdadero
+
+#### Scenario: Rueda sincronizada con el Brush
+
+- GIVEN una ventana reducida con el Brush
+- WHEN el usuario usa la rueda
+- THEN el Brush refleja la nueva ventana visible
+
+#### Scenario: Minimo de ventana
+
+- GIVEN ventana completa
+- WHEN el Brush selecciona menos de 4 puntos
+- THEN la ventana se ajusta al minimo de 4
+
+#### Scenario: Pan sobre el Brush
+
+- GIVEN una ventana con zoom
+- WHEN el usuario arrastra un control del Brush
+- THEN la ventana solo cambia por la accion del Brush, no por el pan del wrapper
+
+### Requirement: Tooltip fijable
+
+El sistema MUST fijar el tooltip del dia con un click en un punto o linea (sobrevive al mouse-out) y MUST soltarlo con un segundo click en el mismo dia o con un click fuera del bloque del Home. Mientras no haya dia fijado, el tooltip MUST seguir el hover. El cursor del tooltip SHOULD dibujarse como crosshair con el estilo del tema.
+
+#### Scenario: Fijar el tooltip
+
+- GIVEN tooltip visible por hover
+- WHEN el usuario hace click en el dia
+- THEN el tooltip queda visible aunque el mouse salga de la grafica
+
+#### Scenario: Soltar el tooltip
+
+- GIVEN tooltip fijado
+- WHEN el usuario hace click de nuevo en el mismo dia o fuera del bloque del Home
+- THEN el tooltip deja de estar fijado y vuelve al hover
 
 ### Requirement: `/runs` solo manuales
 
@@ -102,7 +174,7 @@ El sistema MUST filtrar en cliente las corridas diarias publicas (`visibility`/`
 
 ### Requirement: i18n home.* es+en
 
-El sistema MUST resolver estas claves en ambos idiomas (es sin tildes): `home.title`="Precios del mercado"/"Market prices", `home.subtitle`="Bolsa real, MPO de XM y simulaciones del modelo por dia"/"Real bolsa, XM MPO and model simulations per day", series `home.tx1`="Bolsa real (TX1)"/"Real bolsa (TX1)", `home.mpo`="MPO XM (iMAR)"/"XM MPO (iMAR)", `home.idealSettled`="Ideal liquidado"/"Settled ideal", `home.idealProv`="Ideal provisional"/"Provisional ideal", `home.preideal`="Preideal"/"Preideal", `home.loading`="Cargando serie..."/"Loading series...", `home.empty`="Sin datos de serie todavia."/"No series data yet.", `home.error`="No se pudo cargar la serie."/"Could not load the series.", `home.tx1Lag`="TX1 publica con 2-4 dias de retraso."/"TX1 publishes with a 2-4 day lag.", `sidebar.home`="Inicio"/"Home".
+El sistema MUST resolver estas claves en ambos idiomas (es sin tildes): `home.title`="Precios del mercado"/"Market prices", `home.subtitle`="Bolsa real, MPO de XM y simulaciones del modelo por dia"/"Real bolsa, XM MPO and model simulations per day", series `home.tx1`="Bolsa real (TX1)"/"Real bolsa (TX1)", `home.mpo`="MPO XM (iMAR)"/"XM MPO (iMAR)", `home.idealSettled`="Ideal liquidado"/"Settled ideal", `home.idealProv`="Ideal provisional"/"Provisional ideal", `home.preideal`="Preideal"/"Preideal", `home.loading`="Cargando serie..."/"Loading series...", `home.empty`="Sin datos de serie todavia."/"No series data yet.", `home.error`="No se pudo cargar la serie."/"Could not load the series.", `home.tx1Lag`="TX1 publica con 2-4 dias de retraso."/"TX1 publishes with a 2-4 day lag.", `home.hourly`="Detalle horario"/"Hourly detail", `home.hourlyEmpty`="Sin detalle horario para este dia."/"No hourly detail for this day.", `home.viewRun`="Ver run"/"View run", `home.close`="Cerrar"/"Close", `sidebar.home`="Inicio"/"Home".
 
 #### Scenario: Cambio de idioma
 

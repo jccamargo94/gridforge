@@ -31,6 +31,7 @@ from app.data.xm_bulk import (
     refresh_ofertas,
     refresh_precio_bolsa,
 )
+from app.db.series import ingest_external_window
 from app.scheduler import inputs, plans, timeutil
 
 _SERIES = (
@@ -106,6 +107,16 @@ def refresh_tick(session, *, now, config, data_dir: str = "data", consult=None) 
     # ensure_data_for_date checks and downloads each blob file individually.
     if timeutil.wall_time_reached(now, config.daily_earliest, config.scheduler_tz):
         download.ensure_data_for_date(end_day, data_dir)
+        # REQ-HS-02: after the merge/ensure, upsert the external hourly rows
+        # the window may have brought (bolsa_tx1 from the year CSVs, mpo_xm
+        # from per-date iMAR blobs). Missing sources are skipped inside the
+        # helper (B3) — published days land 24 rows, unpublished stay gaps.
+        ingest_external_window(
+            session,
+            start=end_day - timedelta(days=config.data_refresh_window_days),
+            end_day=end_day,
+            data_dir=data_dir,
+        )
 
     month = plans.next_settlement_month(session, now=now, config=config, data_dir=data_dir)
     if month is None:

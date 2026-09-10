@@ -9,9 +9,11 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -151,3 +153,60 @@ class RunPlan(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Tenant(Base):
+    """Org/workspace a run owner can belong to (multi-tenant scoping)."""
+
+    __tablename__ = "tenants"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class TenantMember(Base):
+    """User <-> tenant membership (composite PK; no FK to auth.users — matches
+    runs.user_id, resolved app-layer from the JWT `sub`)."""
+
+    __tablename__ = "tenant_members"
+
+    tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class HourlySeries(Base):
+    """Narrow hourly price series table: (ts, tenant_id NULL=public, series_key,
+    value, source). Dedupe comes from the two partial unique indexes (D1)."""
+
+    __tablename__ = "hourly_series"
+    __table_args__ = (
+        Index(
+            "uq_hourly_series_public_key",
+            "series_key",
+            "ts",
+            "source",
+            unique=True,
+            postgresql_where=text("tenant_id IS NULL"),
+            sqlite_where=text("tenant_id IS NULL"),
+        ),
+        Index(
+            "uq_hourly_series_tenant_key",
+            "tenant_id",
+            "series_key",
+            "ts",
+            "source",
+            unique=True,
+            postgresql_where=text("tenant_id IS NOT NULL"),
+            sqlite_where=text("tenant_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    tenant_id: Mapped[str | None] = mapped_column(String, ForeignKey("tenants.id"), nullable=True)
+    series_key: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)

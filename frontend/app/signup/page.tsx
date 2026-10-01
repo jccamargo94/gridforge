@@ -27,7 +27,11 @@ export default function SignupPage() {
       setError(t("signup.passwordsDontMatch"));
       return;
     }
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/login` },
+    });
     if (error) {
       setError(error.message);
       return;

@@ -7,7 +7,7 @@ import {
 import { ChartLegend, type ChartLegendItem } from "@/components/chart-legend";
 import { ChartTooltip } from "@/components/chart-tooltip";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
-import { formatNumber } from "@/lib/chart-format";
+import { formatNumber, Y_AXIS_WIDTH } from "@/lib/chart-format";
 import { useT } from "@/lib/i18n-context";
 import { toCongestionCurveData } from "@/lib/nodal-chart-data";
 import type { LmpRow } from "@/lib/types";
@@ -58,7 +58,7 @@ export function CongestionCurvesChart({ rows, hour }: CongestionCurvesChartProps
             <XAxis dataKey="hour" tick={{ fill: "#a1a1aa" }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
               tickLine={{ stroke: "rgba(255,255,255,0.1)" }}
               label={{ value: t("chart.hour"), position: "bottom", offset: 8, fill: "#a1a1aa" }} />
-            <YAxis tickFormatter={(value: number) => formatNumber(value)} tick={{ fill: "#a1a1aa" }}
+            <YAxis width={Y_AXIS_WIDTH} tickFormatter={(value: number) => formatNumber(value)} tick={{ fill: "#a1a1aa" }}
               axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={{ stroke: "rgba(255,255,255,0.1)" }}
               label={{ value: t("runDetail.copMwh"), angle: -90, position: "insideLeft", fill: "#a1a1aa" }} />
             <Tooltip content={<ChartTooltip unit={t("runDetail.copMwh")} hourLabel={t("chart.hourLabel")} />} />

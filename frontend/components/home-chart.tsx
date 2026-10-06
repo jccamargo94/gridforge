@@ -17,7 +17,7 @@ import { ChartLegend } from "@/components/chart-legend";
 import { HomeHourlyPanel } from "@/components/home-hourly-panel";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
 import { useT } from "@/lib/i18n-context";
-import { formatNumber } from "@/lib/chart-format";
+import { formatNumber, Y_AXIS_WIDTH } from "@/lib/chart-format";
 import { isDragGesture } from "@/lib/chart-zoom";
 import type { HourlySeriesKey } from "@/lib/home-hourly";
 import type { ChartSeriesRow } from "@/lib/types";
@@ -236,6 +236,7 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
                 minTickGap={28}
               />
               <YAxis
+                width={Y_AXIS_WIDTH}
                 tick={{ fill: "#a1a1aa" }}
                 tickFormatter={(value: number) => formatNumber(value)}
                 axisLine={{ stroke: "rgba(255,255,255,0.1)" }}

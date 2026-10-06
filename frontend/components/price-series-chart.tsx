@@ -6,7 +6,7 @@ import { useT } from "@/lib/i18n-context";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
 import { ChartLegend } from "@/components/chart-legend";
 import { ChartTooltip } from "@/components/chart-tooltip";
-import { formatNumber } from "@/lib/chart-format";
+import { formatNumber, Y_AXIS_WIDTH } from "@/lib/chart-format";
 import { cn } from "@/lib/utils";
 import {
   CartesianGrid,
@@ -107,6 +107,7 @@ export function PriceSeriesChart({
               }}
             />
             <YAxis
+              width={Y_AXIS_WIDTH}
               tick={{ fill: "#a1a1aa" }}
               tickFormatter={(value: number) => formatNumber(value)}
               axisLine={{ stroke: "rgba(255,255,255,0.1)" }}

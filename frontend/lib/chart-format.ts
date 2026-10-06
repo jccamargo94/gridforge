@@ -1,3 +1,7 @@
+// recharts YAxis defaults to width 60: too narrow for "1,000,000" ticks plus the
+// rotated insideLeft label, which then overlaps/clips the ticks.
+export const Y_AXIS_WIDTH = 88;
+
 export function formatNumber(value: number | null | undefined, decimals = 0): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "\u2014";
   // Solver floating-point noise (e.g. -2.3e-10) rounds to zero at the

@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { ChartTooltip } from "@/components/chart-tooltip";
-import { formatNumber } from "@/lib/chart-format";
+import { formatNumber, Y_AXIS_WIDTH } from "@/lib/chart-format";
 import { buildHourlyPoints, hasHourlyData, type HourlySeriesKey } from "@/lib/home-hourly";
 import { useT } from "@/lib/i18n-context";
 import type { ChartSeriesRow } from "@/lib/types";
@@ -83,7 +83,7 @@ export function HomeHourlyPanel({
               label={{ value: t("chart.hour"), position: "bottom", offset: 4, fill: "#a1a1aa" }}
             />
             <YAxis
-              width={56}
+              width={Y_AXIS_WIDTH}
               tick={{ fill: "#a1a1aa", fontSize: 11 }}
               tickFormatter={(value: number) => formatNumber(value)}
               axisLine={{ stroke: "rgba(255,255,255,0.1)" }}

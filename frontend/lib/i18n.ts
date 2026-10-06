@@ -69,6 +69,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.hourlyEmpty": "Sin detalle horario para este dia.",
     "home.viewRun": "Ver run",
     "home.close": "Cerrar",
+    "home.clickHint": "Haz clic en un dia para ver el detalle horario",
+    "home.tooltipHint": "Clic para ver el detalle horario",
 
     "runDetail.loading": "Cargando detalles...",
     "runDetail.dispatchChart": "Despacho por generador",
@@ -368,6 +370,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "home.hourlyEmpty": "No hourly detail for this day.",
     "home.viewRun": "View run",
     "home.close": "Close",
+    "home.clickHint": "Click a day to see the hourly detail",
+    "home.tooltipHint": "Click to see the hourly detail",
 
     "runDetail.loading": "Loading run details...",
     "runDetail.dispatchChart": "Dispatch by Generator",

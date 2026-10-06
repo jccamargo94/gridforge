@@ -211,7 +211,7 @@ describe("buildGraphElements", () => {
     const pill = collapsed.find((n) => n.id === "costenosaDelCaribeColombiano");
     expect(pill?.type).toBe("zonePill");
     expect(pill?.data.displayName).toBeDefined();
-    expect(pill?.data.displayName.length).toBeLessThanOrEqual(14);
+    expect(pill?.data.displayName?.length).toBeLessThanOrEqual(14);
 
     const expanded = buildGraphElements(longZones, "costenosaDelCaribeColombiano").nodes;
     const card = expanded.find((n) => n.id === "costenosaDelCaribeColombiano");

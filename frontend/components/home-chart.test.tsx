@@ -252,9 +252,54 @@ describe("HomeChart", () => {
     renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
     expect(screen.queryByRole("heading", { name: /detalle horario/i })).not.toBeInTheDocument();
   });
+
+  it("invites the user to click a day while none has been selected", async () => {
+    renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
+    expect(
+      await screen.findByText(/haz clic en un dia para ver el detalle horario/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows the click hint in English when the locale is en", async () => {
+    localStorage.setItem("gridforge-lang", "en");
+    renderChart([makeRow({}), makeRow({ date: "2024-04-19" })]);
+    expect(await screen.findByText(/click a day to see the hourly detail/i)).toBeInTheDocument();
+  });
+
+  it("does not show the click hint on the empty state", () => {
+    renderChart([]);
+    expect(screen.queryByText(/detalle horario/i)).not.toBeInTheDocument();
+  });
 });
 
 describe("HomeChartTooltip", () => {
+  it("shows the optional hint line when provided", () => {
+    render(
+      <I18nProvider>
+        <HomeChartTooltip
+          active
+          label="2024-04-18"
+          hint="Clic para ver el detalle horario"
+          payload={[{ name: "Bolsa real (TX1)", value: 1, color: "#22c55e", dataKey: "bolsa_tx1" }]}
+        />
+      </I18nProvider>
+    );
+    expect(screen.getByText("Clic para ver el detalle horario")).toBeInTheDocument();
+  });
+
+  it("omits the hint line by default", () => {
+    render(
+      <I18nProvider>
+        <HomeChartTooltip
+          active
+          label="2024-04-18"
+          payload={[{ name: "Bolsa real (TX1)", value: 1, color: "#22c55e", dataKey: "bolsa_tx1" }]}
+        />
+      </I18nProvider>
+    );
+    expect(screen.queryByText(/detalle horario/i)).not.toBeInTheDocument();
+  });
+
   it("lists only non-null series plus the date", () => {
     render(
       <I18nProvider>

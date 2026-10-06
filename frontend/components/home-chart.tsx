@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Zap } from "lucide-react";
+import { MousePointerClick, Zap } from "lucide-react";
 import { ChartLegend } from "@/components/chart-legend";
 import { HomeHourlyPanel } from "@/components/home-hourly-panel";
 import { useChartZoom } from "@/hooks/use-chart-zoom";
@@ -79,11 +79,13 @@ export function HomeChartTooltip({
   payload,
   label,
   unit,
+  hint,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<HomeTooltipEntry>;
   label?: string | number;
   unit?: string;
+  hint?: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const visible = payload.filter(
@@ -112,6 +114,9 @@ export function HomeChartTooltip({
           </li>
         ))}
       </ul>
+      {hint && (
+        <p className="mt-2 border-t border-zinc-800 pt-1.5 text-xs text-zinc-400">{hint}</p>
+      )}
     </div>
   );
 }
@@ -121,6 +126,8 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
   const router = useRouter();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Once the user has opened any day they know the gesture: stop nudging.
+  const [hintDismissed, setHintDismissed] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const pressRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -173,6 +180,16 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
 
   return (
     <div ref={rootRef}>
+      {!empty && !hintDismissed && (
+        <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900/60 px-3 py-1 text-xs text-zinc-300">
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
+            <span className="relative inline-flex size-2 rounded-full bg-amber-400" />
+          </span>
+          <MousePointerClick className="size-3.5" aria-hidden="true" />
+          {t("home.clickHint")}
+        </p>
+      )}
       {empty ? (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
           <Zap className="size-10 text-muted-foreground/40" />
@@ -197,7 +214,7 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
           title={t("chart.zoomHint")}
           className={cn(
             "w-full",
-            isZoomed ? "cursor-grab select-none active:cursor-grabbing" : "cursor-crosshair"
+            isZoomed ? "cursor-grab select-none active:cursor-grabbing" : "cursor-pointer"
           )}
           style={{ minHeight: 320 }}
         >
@@ -207,6 +224,7 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
               margin={{ top: 8, right: 16, left: 8, bottom: 32 }}
               onClick={(state) => {
                 setSelectedDate((current) => nextSelectedDate(current, state.activeLabel));
+                if (state.activeLabel !== undefined) setHintDismissed(true);
               }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -231,7 +249,12 @@ export function HomeChart({ rows }: { rows: ChartSeriesRow[] | null }) {
               />
               <Tooltip
                 trigger={selectedDate === null ? "hover" : "click"}
-                content={<HomeChartTooltip unit={t("runDetail.copMwh")} />}
+                content={
+                  <HomeChartTooltip
+                    unit={t("runDetail.copMwh")}
+                    hint={selectedDate === null ? t("home.tooltipHint") : undefined}
+                  />
+                }
                 cursor={{ stroke: "rgba(255,255,255,0.25)", strokeDasharray: "3 3" }}
               />
               {SERIES.map((s) => (

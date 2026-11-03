@@ -13,6 +13,7 @@ from app.data.actuals import load_reference_price
 from app.data.topology import service as topology_service
 from app.db import queries
 from app.db.session import get_engine, get_sessionmaker
+from app.market import service as market_service
 from app.nodal.network.schemas import NodalNetwork
 from app.schemas import BessScenario, DispatchLevel
 from app.storage import get_storage
@@ -512,3 +513,44 @@ def download_nodal_artifact(
     logical = _normalize_nodal_artifact(artifact)
     _, path = _get_owned_nodal_result(session, run, logical)
     return FileResponse(path)
+
+
+def _parse_own(own: str) -> list[str]:
+    names = sorted({n.strip() for n in own.split(",") if n.strip()})
+    if not names:
+        raise HTTPException(status_code=422, detail="own: at least one resource name")
+    return names
+
+
+@app.get("/market/merit-position")
+def get_merit_position(
+    own: str,
+    day: date = Query(alias="date"),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Hour-by-hour merit-order position of `own` (comma-separated resource
+    names) for one day, plus rivals aggregated by technology (never by name)."""
+    try:
+        return market_service.merit_position(day, _parse_own(own))
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="no observed market data for that date"
+        ) from exc
+
+
+@app.get("/market/position-series")
+def get_position_series(
+    start: date,
+    end: date,
+    own: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Daily evolution of `own` resources' merit-order position over a range."""
+    try:
+        return market_service.position_series(start, end, _parse_own(own))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="no observed market data for that range"
+        ) from exc

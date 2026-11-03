@@ -216,3 +216,20 @@ def test_alembic_upgrade_head_adds_run_plans_and_daily_columns(tmp_path):
     assert "input_grade" not in run_columns
     metric_columns = {c["name"] for c in inspect(engine).get_columns("metric_sets")}
     assert "reference" not in metric_columns
+
+
+def test_alembic_upgrade_head_adds_delta_i_metric_columns(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'migration_delta_i.db'}"
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(cfg, "head")
+
+    columns = {c["name"] for c in inspect(create_engine(database_url)).get_columns("metric_sets")}
+    assert {
+        "delta_i",
+        "delta_i_hours_matched",
+        "rmse_ex_delta",
+        "mae_ex_delta",
+        "bias_ex_delta",
+        "wape_ex_delta",
+    }.issubset(columns)

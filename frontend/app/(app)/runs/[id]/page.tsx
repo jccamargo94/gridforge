@@ -173,6 +173,22 @@ export default function RunDetailPage() {
             value={formatMetric(data.metrics.r2, 4)}
             icon={TrendingUp}
           />
+          {data.metrics.delta_i != null && (
+            <MetricCard
+              label={t("runDetail.deltaI")}
+              value={formatMetric(data.metrics.delta_i)}
+              unit={t("runDetail.copMwh")}
+              icon={Activity}
+            />
+          )}
+          {data.metrics.wape_ex_delta != null && (
+            <MetricCard
+              label={t("runDetail.waped")}
+              value={formatPercent(data.metrics.wape_ex_delta)}
+              unit="%"
+              icon={TrendingDown}
+            />
+          )}
           <MetricCard
             label={t("runDetail.dispatchMae")}
             value={formatMetric(data.metrics.dispatch_mae_mw)}

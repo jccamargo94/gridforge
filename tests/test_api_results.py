@@ -155,7 +155,13 @@ def _seed_run_with_price_and_marginal(api_client, tmp_path, monkeypatch):
         ok=True,
         price_path=str(price_csv),
         marginal_plants_path=str(marginal_csv),
-        metrics={"mae": 1.0, "dispatch_mae_mw": 12.5, "dispatch_rmse_mw": 15.0},
+        metrics={
+            "mae": 1.0,
+            "dispatch_mae_mw": 12.5,
+            "dispatch_rmse_mw": 15.0,
+            "delta_i": 7000.0,
+            "wape_ex_delta": 0.04,
+        },
     )
     queries.finish_run_ok(session, run, result, out_dir=str(out_dir))
     session.close()
@@ -174,6 +180,9 @@ def test_get_run_detail_includes_price_series_and_dispatch_metrics(
 
     assert body["metrics"]["dispatch_mae_mw"] == 12.5
     assert body["metrics"]["dispatch_rmse_mw"] == 15.0
+    assert body["metrics"]["delta_i"] == 7000.0
+    assert body["metrics"]["wape_ex_delta"] == 0.04
+    assert body["metrics"]["mae_ex_delta"] is None
     assert body["artifacts"]["marginal_plants"] is True
 
     price_series = body["price_series"]

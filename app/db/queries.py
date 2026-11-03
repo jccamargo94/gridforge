@@ -17,6 +17,17 @@ from app.db.models import (
 from app.db.series import ingest_run_price_rows
 from app.schemas import BessScenario, NodalRunResult, RunResult
 
+# dI (valor adicional) metrics from app/pipeline/delta_i.py; absent from
+# `metrics` -> stored as NULL (preideal runs, days without a trustworthy fit).
+DELTA_I_FIELDS = (
+    "delta_i",
+    "delta_i_hours_matched",
+    "rmse_ex_delta",
+    "mae_ex_delta",
+    "bias_ex_delta",
+    "wape_ex_delta",
+)
+
 
 def create_scenario(session: Session, scenario: BessScenario, created_by: str) -> Scenario:
     row = Scenario(
@@ -130,6 +141,7 @@ def finish_run_ok(
                 bess_net_revenue=bess.get("bess_net_revenue"),
                 dispatch_mae_mw=metrics.get("dispatch_mae_mw"),
                 dispatch_rmse_mw=metrics.get("dispatch_rmse_mw"),
+                **{k: metrics.get(k) for k in DELTA_I_FIELDS},
                 reference=reference,
                 evaluated_at=datetime.now(timezone.utc) if reference else None,
             )
@@ -252,6 +264,8 @@ def update_metric_set(
     ms.wape = metrics.get("wape")
     ms.smape = metrics.get("smape")
     ms.r2 = metrics.get("r2")
+    for k in DELTA_I_FIELDS:
+        setattr(ms, k, metrics.get(k))
     ms.reference = reference
     ms.evaluated_at = datetime.now(timezone.utc)
     session.add(ms)

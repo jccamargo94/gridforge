@@ -344,6 +344,7 @@ def get_run_detail(
             "bess_net_revenue": metric_set.bess_net_revenue,
             "dispatch_mae_mw": metric_set.dispatch_mae_mw,
             "dispatch_rmse_mw": metric_set.dispatch_rmse_mw,
+            **{k: getattr(metric_set, k) for k in queries.DELTA_I_FIELDS},
         }
         if metric_set
         else None

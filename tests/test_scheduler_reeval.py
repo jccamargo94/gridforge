@@ -121,6 +121,35 @@ def test_reevaluate_metrics_against_bolsa_stamps_reference(tmp_path):
     assert ms.reference == "bolsa_tx1"
 
 
+def test_reevaluate_bolsa_persists_delta_i_metrics(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "app.scheduler.reeval.delta_i_metrics",
+        lambda *a, **k: {"delta_i": 5000.0, "delta_i_hours_matched": 24.0, "wape_ex_delta": 0.01},
+    )
+    session = _session()
+    run = _done_run(session, tmp_path, level=DispatchLevel.ideal)
+    reevaluate_metrics(session, run, reference="bolsa_tx1", data_dir=DD)
+    ms = queries.get_metric_set(session, run.id)
+    assert ms.delta_i == 5000.0
+    assert ms.wape_ex_delta == 0.01
+
+
+def test_reevaluate_imar_does_not_compute_delta_i(tmp_path, monkeypatch):
+    def _boom(*a, **k):
+        raise AssertionError("dI no aplica a iMAR")
+
+    monkeypatch.setattr("app.scheduler.reeval.delta_i_metrics", _boom)
+    monkeypatch.setattr("app.scheduler.reeval.download.force_refresh_blob", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "app.scheduler.reeval._ACTUAL_BY_REFERENCE",
+        {"iMAR": lambda d, data_dir="data": [200000.0] * 24},
+    )
+    session = _session()
+    run = _done_run(session, tmp_path)
+    reevaluate_metrics(session, run, reference="iMAR", data_dir=DD)
+    assert queries.get_metric_set(session, run.id).delta_i is None
+
+
 def test_reevaluate_metrics_raises_when_price_csv_missing(tmp_path):
     session = _session()
     run = queries.create_case_and_run(

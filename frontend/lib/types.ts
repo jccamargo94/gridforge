@@ -44,6 +44,12 @@ export interface RunMetrics {
   r2: number | null;
   dispatch_mae_mw: number | null;
   dispatch_rmse_mw: number | null;
+  delta_i?: number | null;
+  delta_i_hours_matched?: number | null;
+  rmse_ex_delta?: number | null;
+  mae_ex_delta?: number | null;
+  bias_ex_delta?: number | null;
+  wape_ex_delta?: number | null;
   bess_charge_mwh: number | null;
   bess_discharge_mwh: number | null;
   bess_avg_soc_mwh: number | null;

@@ -25,38 +25,64 @@ def apply_thermal_real_generation(
     thermal_names,
     gene_mw: pd.DataFrame,
     *,
+    cc_groups: dict[str, list[str]] | None = None,
     min_offer: float = MIN_OFFER,
 ):
-    """Devuelve ``(Pmax, demand, fixed)`` nuevos.
+    """Devuelve ``(Pmax, demand, fixed, unmatched)`` nuevos.
 
     ``gene_mw``: columnas ``datetime, resource_name, gen`` ya en MW.
+    ``cc_groups``: ciclos combinados, ``{nombre en Gene: [configuraciones del modelo]}``.
+    Las configuraciones de un ciclo son excluyentes (solo una opera a la vez), asi que la
+    generacion real de la planta se descuenta **una sola vez** de la demanda (acotada por
+    la mayor configuracion disponible) y de cada configuracion.
     ``fixed``: ``{planta: MW totales del dia}`` de las plantas efectivamente fijadas.
+    ``unmatched``: candidatas (oferta > ``min_offer``) sin serie en Gene.
     """
+    cc_groups = {k.upper().strip(): list(v) for k, v in (cc_groups or {}).items()}
+    in_cc = {c for cfgs in cc_groups.values() for c in cfgs}
+
     gene = {}
     for name, grp in gene_mw.groupby(gene_mw["resource_name"].str.upper().str.strip()):
         gene[name] = grp.groupby("datetime")["gen"].sum()
 
-    selected = [
-        g
-        for g in thermal_names
-        if g in beta.index and beta[g] > min_offer and g.upper().strip() in gene
-    ]
+    # grupo = (nombre Gene, [generadores del modelo])
+    groups: list[tuple[str, list[str]]] = []
+    unmatched: list[str] = []
+    for g in thermal_names:
+        if g in in_cc or g not in beta.index or beta[g] <= min_offer:
+            continue
+        key = g.upper().strip()
+        if key in gene:
+            groups.append((key, [g]))
+        else:
+            unmatched.append(g)
+    for key, cfgs in cc_groups.items():
+        cfgs = [c for c in cfgs if c in beta.index]
+        if not cfgs or min(beta[c] for c in cfgs) <= min_offer:
+            continue
+        if key in gene:
+            groups.append((key, cfgs))
+        else:
+            unmatched.append(key)
+
     new_pmax = dict(Pmax)
     is_dict = isinstance(demand, dict)
     dem = pd.Series(demand, dtype=float).copy()
     fixed: dict[str, float] = {}
     for ts in dem.index:
         removed = 0.0
-        for g in selected:
-            key = (g, ts)
-            if key not in new_pmax:
+        for key, members in groups:
+            avail = [new_pmax[(m, ts)] for m in members if (m, ts) in new_pmax]
+            if not avail:
                 continue
-            use = min(float(gene[g.upper().strip()].get(ts, 0.0)), new_pmax[key])
+            use = min(float(gene[key].get(ts, 0.0)), max(avail))
             if use <= 0:
                 continue
-            new_pmax[key] = max(new_pmax[key] - use, 0.0)
+            for m in members:
+                if (m, ts) in new_pmax:
+                    new_pmax[(m, ts)] = max(new_pmax[(m, ts)] - use, 0.0)
             removed += use
-            fixed[g] = fixed.get(g, 0.0) + use
+            fixed[key] = fixed.get(key, 0.0) + use
         dem[ts] = max(dem[ts] - removed, 0.0)
     new_demand = dem.to_dict() if is_dict else dem
-    return new_pmax, new_demand, fixed
+    return new_pmax, new_demand, fixed, sorted(unmatched)

@@ -599,8 +599,14 @@ def build_case(
         gene_mw = load_gene_day(dd, DISPATCH_DATE)
         gene_mw = gene_mw.assign(gen=gene_mw["gen"] * 1e-3)
         thermals = dispo.loc[dispo["gen_type"] == "TERMICA", "resource_name"].unique()
-        pmax_fixed, demand_fixed, fixed = apply_thermal_real_generation(
-            param_data["Pmax"], param_data["demand"], beta, thermals, gene_mw
+        cc_groups = {CC_MAP[plant]: list(configs) for plant, configs in CC.items()}
+        pmax_fixed, demand_fixed, fixed, unmatched = apply_thermal_real_generation(
+            param_data["Pmax"],
+            param_data["demand"],
+            beta,
+            thermals,
+            gene_mw,
+            cc_groups=cc_groups,
         )
         param_data["Pmax"] = pmax_fixed
         param_data["demand"] = demand_fixed
@@ -608,6 +614,11 @@ def build_case(
             f"WARNING: thermal_real_generation activo: {len(fixed)} termicas fijadas a su "
             f"generacion real (Gene) en {DISPATCH_DATE}: {sorted(fixed)}"
         )
+        if unmatched:
+            print(
+                f"WARNING: {len(unmatched)} termicas candidatas sin serie en Gene para "
+                f"{DISPATCH_DATE}, no se fijan: {unmatched}"
+            )
 
     if case.bess_scenario is not None:
         bess_names, bess_params_model = bess_scenario_to_params(case.bess_scenario)

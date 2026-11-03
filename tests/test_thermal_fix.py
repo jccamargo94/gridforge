@@ -23,7 +23,7 @@ def _inputs():
 def test_residual_subtracts_from_demand_and_pmax():
     pmax, demand, beta = _inputs()
     gene = _gene([(t, "termo a", 60.0) for t in HOURS] + [(HOURS[0], "TERMO B", 150.0)])
-    new_pmax, new_demand, fixed = apply_thermal_real_generation(
+    new_pmax, new_demand, fixed, _ = apply_thermal_real_generation(
         pmax, demand, beta, ["TERMO A", "TERMO B"], gene
     )
     assert new_pmax[("TERMO A", HOURS[0])] == pytest.approx(40.0)
@@ -39,17 +39,39 @@ def test_residual_subtracts_from_demand_and_pmax():
 def test_cheap_or_unknown_plants_not_fixed():
     pmax, demand, beta = _inputs()
     gene = _gene([(t, "BARATA", 80.0) for t in HOURS] + [(t, "OTRA", 50.0) for t in HOURS])
-    new_pmax, new_demand, fixed = apply_thermal_real_generation(
+    new_pmax, new_demand, fixed, _ = apply_thermal_real_generation(
         pmax, demand, beta, ["BARATA", "OTRA"], gene
     )
     assert fixed == {} and new_pmax == pmax
     assert list(new_demand) == list(demand)
 
 
+def test_unmatched_candidates_are_reported():
+    pmax, demand, beta = _inputs()
+    gene = _gene([(t, "TERMO A", 10.0) for t in HOURS])
+    *_, unmatched = apply_thermal_real_generation(pmax, demand, beta, ["TERMO A", "TERMO B"], gene)
+    assert unmatched == ["TERMO B"]
+
+
+def test_combined_cycle_configs_subtract_demand_once():
+    t = HOURS
+    pmax = {(c, h): cap for c, cap in (("XCC_1", 100.0), ("XCC_2", 250.0)) for h in t}
+    beta = pd.Series({"XCC_1": 500_000.0, "XCC_2": 480_000.0})
+    demand = pd.Series([1000.0] * 3, index=t)
+    gene = _gene([(h, "X CC", 180.0) for h in t])
+    new_pmax, new_demand, fixed, unmatched = apply_thermal_real_generation(
+        pmax, demand, beta, ["XCC_1", "XCC_2"], gene, cc_groups={"X CC": ["XCC_1", "XCC_2"]}
+    )
+    # una sola deduccion (180), no una por configuracion
+    assert new_demand[t[0]] == pytest.approx(820.0)
+    assert new_pmax[("XCC_1", t[0])] == 0.0 and new_pmax[("XCC_2", t[0])] == pytest.approx(70.0)
+    assert fixed == {"X CC": pytest.approx(540.0)} and unmatched == []
+
+
 def test_dict_demand_preserved_and_floor_zero():
     pmax, demand, beta = _inputs()
     gene = _gene([(t, "TERMO A", 100.0) for t in HOURS])
-    _, new_demand, _ = apply_thermal_real_generation(
+    _, new_demand, _, _ = apply_thermal_real_generation(
         pmax, {t: 30.0 for t in HOURS}, beta, ["TERMO A"], gene
     )
     assert isinstance(new_demand, dict) and all(v == 0.0 for v in new_demand.values())

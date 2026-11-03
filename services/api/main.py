@@ -554,3 +554,31 @@ def get_position_series(
         raise HTTPException(
             status_code=404, detail="no observed market data for that range"
         ) from exc
+
+
+class OfferToAudit(BaseModel):
+    resource: str
+    price_cop_mwh: float | None = None
+
+
+class OfferAuditRequest(BaseModel):
+    date: date
+    offers: list[OfferToAudit]
+    window_days: int = 90
+
+
+@app.post("/market/offer-audit")
+def post_offer_audit(body: OfferAuditRequest, user_id: str = Depends(get_current_user_id)):
+    """Compare each offer (a candidate price, or the published one when
+    `price_cop_mwh` is null) with that resource's own recent history.
+    Descriptive only: it never recommends a price."""
+    if not body.offers or len(body.offers) > 50:
+        raise HTTPException(status_code=422, detail="offers: 1..50 items")
+    try:
+        return market_service.audit_offers(
+            body.date, [(o.resource, o.price_cop_mwh) for o in body.offers], body.window_days
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="no offer history for that date") from exc

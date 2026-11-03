@@ -291,3 +291,25 @@ export interface MarginalMapResponse {
   zone_mapped_share: number | null;
   cells: MarginalCell[];
 }
+
+export interface AvailabilityFinding {
+  resource: string;
+  capacity_mw: number;
+  issues: ("exceeds_capacity" | "persistent_low" | "hour_pattern")[];
+  days_observed: number;
+  days_over_capacity: number;
+  max_ratio_to_capacity: number;
+  longest_low_run_days: number;
+  outage_days: number;
+  zero_hours: number[];
+}
+
+export interface AvailabilityCheckResponse {
+  params: { low_pct: number; min_days: number; over_tol: number };
+  resources_in_dispo: number;
+  matched: number;
+  match_rate: number;
+  unmatched_resources: string[];
+  ambiguous_paratec_names: number;
+  findings: AvailabilityFinding[];
+}

@@ -600,3 +600,24 @@ def get_marginal_map(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="no market data for that range") from exc
+
+
+@app.get("/market/availability-check")
+def get_availability_check(
+    start: date,
+    end: date,
+    low_pct: float = 0.5,
+    min_days: int = 3,
+    over_tol: float = 0.02,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Declared availability (DispoDeclarada) vs PARATEC net effective capacity.
+    Needs the topology scrape (POST /topology/scrape) to have cached capacity."""
+    try:
+        return market_service.availability_check(start, end, low_pct, min_days, over_tol)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail="missing availability data or cached PARATEC capacity"
+        ) from exc

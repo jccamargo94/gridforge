@@ -10,7 +10,8 @@ from datetime import date, timedelta
 import pandas as pd
 
 from app.data import loaders
-from app.market import marginal, merit, offer_audit
+from app.data.topology.parse import parse_generators
+from app.market import availability, marginal, merit, offer_audit
 from app.storage import get_storage
 
 MAX_RANGE_DAYS = 92
@@ -105,3 +106,26 @@ def marginal_map(start: date, end: date, tol: float) -> dict:
     return marginal.marginal_map(
         dispo, ofertas, spot, tol=tol, zone_by_resource=_zone_by_resource()
     )
+
+
+MAX_AVAILABILITY_DAYS = 92
+CAPACITY_RAW_PATH = "topology/raw/capacity.json"  # written by app/data/topology/fetch.py
+
+
+def availability_check(start: date, end: date, low_pct: float, min_days: int, over_tol: float):
+    if end < start or (end - start).days + 1 > MAX_AVAILABILITY_DAYS:
+        raise ValueError(f"range must be 1..{MAX_AVAILABILITY_DAYS} days")
+    if not (0.0 < low_pct <= 1.0 and 1 <= min_days <= 31 and 0.0 <= over_tol <= 0.5):
+        raise ValueError("low_pct in (0,1], min_days 1..31, over_tol 0..0.5")
+    storage = get_storage(data_dir())
+    if not storage.exists(CAPACITY_RAW_PATH):
+        raise FileNotFoundError(CAPACITY_RAW_PATH)
+    with storage.open(CAPACITY_RAW_PATH) as fh:
+        generators = parse_generators(json.load(fh), [], [], [], [])
+    capacity, collisions = availability.capacity_by_name(generators)
+    dispo, _, _ = _load(start, end)
+    out = availability.check_availability(
+        dispo, capacity, low_pct=low_pct, min_days=min_days, over_tol=over_tol
+    )
+    out["ambiguous_paratec_names"] = len(collisions)
+    return out

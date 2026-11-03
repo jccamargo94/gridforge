@@ -144,6 +144,39 @@ def test_finish_run_ok_writes_metric_set():
     assert metric_set.rmse == 2.0
 
 
+def test_finish_run_ok_persists_delta_i_metrics():
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="ideal",
+        solver="appsi_highs",
+        compute_prices=True,
+        scenario_id=None,
+    )
+    dispatch_case = DispatchCase(dispatch_date=date(2024, 4, 18), level=DispatchLevel.ideal)
+    result = RunResult(
+        case=dispatch_case,
+        ok=True,
+        price_path="p.csv",
+        metrics={
+            "mae": 1.0,
+            "delta_i": 8000.0,
+            "delta_i_hours_matched": 22.0,
+            "wape_ex_delta": 0.05,
+            "mae_ex_delta": 0.5,
+        },
+    )
+    queries.finish_run_ok(session, run, result, out_dir="data/results/x")
+
+    ms = queries.get_metric_set(session, run.id)
+    assert ms.delta_i == 8000.0
+    assert ms.delta_i_hours_matched == 22.0
+    assert ms.wape_ex_delta == 0.05
+    assert ms.mae_ex_delta == 0.5
+    assert ms.rmse_ex_delta is None
+
+
 def test_finish_run_ok_without_metrics_skips_metric_set():
     session = _session()
     run = queries.create_case_and_run(

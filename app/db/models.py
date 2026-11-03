@@ -93,6 +93,12 @@ class MetricSet(Base):
     bess_net_revenue: Mapped[float | None] = mapped_column(Float, nullable=True)
     dispatch_mae_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
     dispatch_rmse_mw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delta_i: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delta_i_hours_matched: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rmse_ex_delta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mae_ex_delta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bias_ex_delta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    wape_ex_delta: Mapped[float | None] = mapped_column(Float, nullable=True)
     reference: Mapped[str | None] = mapped_column(String, nullable=True)
     evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

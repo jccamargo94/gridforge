@@ -13,6 +13,7 @@ import pandas as pd
 from app.data import download
 from app.data.actuals import load_actual_bolsa, load_actual_price
 from app.db import queries
+from app.pipeline.delta_i import delta_i_metrics
 from app.storage import get_storage
 from app.utils.metrics import price_metrics
 
@@ -57,5 +58,9 @@ def reevaluate_metrics(session, run, *, reference: str, data_dir: str = "data") 
     xm = actual_fn(case.dispatch_date, data_dir=data_dir)
     n = min(len(xm), len(model_mpo))
     metrics = price_metrics(xm[:n], model_mpo[:n])
+    if reference == "bolsa_tx1":
+        metrics.update(
+            delta_i_metrics(case.dispatch_date, xm[:n], model_mpo[:n], data_dir=data_dir)
+        )
     queries.update_metric_set(session, run.id, metrics=metrics, reference=reference)
     return metrics

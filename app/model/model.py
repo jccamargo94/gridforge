@@ -330,7 +330,7 @@ class UnitCommitmentModel:
         # valid duals" when asked to import them after a MIP solve. Keep the
         # dual Suffix local (not imported) for the MILP; it is re-enabled for
         # the pricing LP, the only solve whose duals are used.
-        self._model.dual.set_direction(pyo.Suffix.LOCAL)
+        self._model.dual.direction = pyo.Suffix.LOCAL
         try:
             model_solver = pyo.SolverFactory(solver, **kwargs)
             results = model_solver.solve(
@@ -339,7 +339,7 @@ class UnitCommitmentModel:
                 # tee=True
             )
         finally:
-            self._model.dual.set_direction(pyo.Suffix.IMPORT_EXPORT)
+            self._model.dual.direction = pyo.Suffix.IMPORT_EXPORT
         if compute_prices:
             self._solve_pricing_lp(solver=solver, solver_params=solver_params, **kwargs)
         return results

@@ -12,6 +12,7 @@ from app.data.actuals import load_actual_dispatch, load_reference_price
 from app.data.heuristic.biddings import _match_resource_name
 from app.model.model import UnitCommitmentModel
 from app.pipeline.case_builder import build_case
+from app.pipeline.delta_i import delta_i_metrics
 from app.pipeline.results import extract_dispatch, extract_mpo, save_results
 from app.schemas import DispatchCase, DispatchLevel, InputPack, InputSource, RunResult
 from app.storage import get_storage
@@ -49,6 +50,12 @@ def run_case(
                 model_mpo = extract_mpo_sorted(model)
                 n = min(len(xm), len(model_mpo))
                 metrics = price_metrics(xm[:n], model_mpo[:n])
+                if case.level in (DispatchLevel.ideal, DispatchLevel.lmp):
+                    metrics.update(
+                        delta_i_metrics(
+                            case.dispatch_date, xm[:n], model_mpo[:n], data_dir=data_dir
+                        )
+                    )
             except (FileNotFoundError, ValueError):
                 print(f"  ! no XM actuals for {case.dispatch_date}; skipping metrics")
                 metrics = None

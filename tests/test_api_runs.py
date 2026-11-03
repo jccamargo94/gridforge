@@ -128,3 +128,25 @@ def test_get_run_artifacts_reflects_available_paths(api_client, tmp_path):
         "bess": False,
         "marginal_plants": False,
     }
+
+
+def test_scheduled_runs_are_visible_to_any_user(api_client):
+    from datetime import date
+
+    from app.db import queries
+
+    session = api_client.SessionLocal()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=date(2024, 4, 18),
+        level="ideal",
+        solver="cbc",
+        compute_prices=True,
+        scenario_id=None,
+        user_id="system:scheduler",
+        source="scheduled",
+    )
+    assert api_client.get(f"/runs/{run.id}").status_code == 200
+    listed = api_client.get("/runs").json()
+    assert [r["run_id"] for r in listed] == [run.id]
+    assert listed[0]["source"] == "scheduled"

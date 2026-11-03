@@ -1,7 +1,7 @@
 from datetime import date as date_
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Case, InputDataset, MetricSet, Run, Scenario
@@ -39,6 +39,7 @@ def create_case_and_run(
     compute_prices: bool,
     scenario_id: str | None,
     user_id: str,
+    source: str = "manual",
 ) -> Run:
     case = Case(
         dispatch_date=dispatch_date,
@@ -50,7 +51,7 @@ def create_case_and_run(
     session.add(case)
     session.flush()  # populate case.id before Run references it
 
-    run = Run(case_id=case.id, user_id=user_id, status="pending")
+    run = Run(case_id=case.id, user_id=user_id, status="pending", source=source)
     session.add(run)
     session.commit()
     session.refresh(run)
@@ -66,7 +67,30 @@ def get_case(session: Session, case_id: str) -> Case | None:
 
 
 def list_runs_for_user(session: Session, user_id: str) -> list[Run]:
-    stmt = select(Run).where(Run.user_id == user_id).order_by(Run.created_at.desc())
+    # Scheduled runs are shared market data ("el mercado de hoy"), visible to everyone.
+    stmt = (
+        select(Run)
+        .where(or_(Run.user_id == user_id, Run.source == "scheduled"))
+        .order_by(Run.created_at.desc())
+    )
+    return list(session.scalars(stmt))
+
+
+def list_runs_for_case_key(
+    session: Session, *, dispatch_date: date_, level: str, solver: str
+) -> list[Run]:
+    """All runs (any source) for the baseline case (no BESS scenario) of a date/level/solver."""
+    stmt = (
+        select(Run)
+        .join(Case, Case.id == Run.case_id)
+        .where(
+            Case.dispatch_date == dispatch_date,
+            Case.level == level,
+            Case.solver == solver,
+            Case.scenario_id.is_(None),
+        )
+        .order_by(Run.created_at)
+    )
     return list(session.scalars(stmt))
 
 

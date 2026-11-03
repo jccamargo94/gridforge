@@ -475,6 +475,28 @@ corrida ya habia escrito una fila en `metric_sets` antes de atascarse, borrar
 esa fila primero — `metric_sets.run_id` es unico, y una segunda escritura
 fallara con un error de constraint.
 
+### Corridas diarias automaticas (scheduler en el worker)
+
+El worker puede crear solo las corridas `ideal` y `preideal` del dia mas
+reciente (`app/scheduler/daily.py`). Esta **apagado por defecto**; se activa con
+`DAILY_SCHEDULER_ENABLED=true`. Solo crea corridas `pending` (source
+`scheduled`, usuario `system:scheduler`); el loop normal del worker las ejecuta.
+Las corridas programadas son visibles para todos los usuarios autenticados.
+
+- Fecha objetivo: hoy en hora Colombia (UTC-5) menos `DAILY_RUN_LAG_DAYS` (default 1).
+- No crea nada antes de `DAILY_RUN_HOUR` (default 6, hora Colombia).
+- Si ya existe una corrida pending/running/done (manual o programada) para esa
+  fecha/nivel/solver sin escenario BESS, no crea otra.
+- Si solo hay fallidas, reintenta cada `DAILY_RUN_RETRY_MINUTES` (default 60)
+  hasta `DAILY_RUN_MAX_ATTEMPTS` (default 3) intentos programados; despues deja
+  las corridas `failed` visibles en `/runs` (no hay reintento infinito).
+- Otros: `DAILY_RUN_LEVELS` (default `ideal,preideal`), `DAILY_RUN_SOLVER` (`cbc`).
+
+Requiere aplicar la migracion 0005 (`runs.source`). Limitaciones conocidas: no
+hay alerta externa (solo el estado `failed` visible); el horario real de
+publicacion de cada archivo XM no esta verificado, por eso el reintento; LMP no
+esta incluido (el nivel `lmp` no existe aun en `DispatchLevel`).
+
 ### Frontend (Fase 4)
 
 Desde Fase 4 el repo incluye un frontend Next.js (`frontend/`) construido con

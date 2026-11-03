@@ -57,6 +57,8 @@ class Run(Base):
     case_id: Mapped[str] = mapped_column(String, ForeignKey("cases.id"), nullable=False)
     user_id: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
+    # "manual" (created from the API/UI) or "scheduled" (daily scheduler).
+    source: Mapped[str] = mapped_column(String, default="manual", server_default="manual")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

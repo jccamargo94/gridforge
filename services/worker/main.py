@@ -2,6 +2,7 @@ import contextlib
 import io
 import time
 import traceback
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -9,10 +10,12 @@ from app.db import queries
 from app.db.claim import claim_next_pending_run
 from app.db.session import get_engine, get_sessionmaker
 from app.pipeline.runner import run_case
+from app.scheduler.daily import SchedulerConfig, enqueue_daily_runs
 from app.schemas import BessScenario, DispatchCase, DispatchLevel
 from app.storage import get_storage
 
 POLL_INTERVAL_SECONDS = 5
+SCHEDULER_INTERVAL_SECONDS = 60
 
 
 def _build_case(session: Session, case_row) -> DispatchCase:
@@ -83,7 +86,17 @@ def process_once(
 def main() -> None:
     engine = get_engine()
     session_factory = get_sessionmaker(engine)
+    scheduler_cfg = SchedulerConfig.from_env()
+    next_scheduler_tick = 0.0
     while True:
+        if scheduler_cfg.enabled and time.monotonic() >= next_scheduler_tick:
+            next_scheduler_tick = time.monotonic() + SCHEDULER_INTERVAL_SECONDS
+            with session_factory() as session:
+                try:
+                    enqueue_daily_runs(session, datetime.now(timezone.utc), scheduler_cfg)
+                except Exception:
+                    session.rollback()
+                    traceback.print_exc()
         with session_factory() as session:
             try:
                 processed = process_once(session)

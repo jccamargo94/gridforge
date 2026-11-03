@@ -81,6 +81,7 @@ def _run_summary(run, case) -> dict:
     return {
         "run_id": run.id,
         "status": run.status,
+        "source": run.source,
         "dispatch_date": case.dispatch_date,
         "level": case.level,
         "scenario_id": case.scenario_id,
@@ -127,7 +128,7 @@ def _price_series(run, case) -> list[dict] | None:
 
 def _get_owned_run(session, run_id: str, user_id: str):
     run = queries.get_run(session, run_id)
-    if run is None or run.user_id != user_id:
+    if run is None or (run.user_id != user_id and run.source != "scheduled"):
         raise HTTPException(status_code=404, detail="run not found")
     return run
 

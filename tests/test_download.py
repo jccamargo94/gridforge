@@ -69,3 +69,16 @@ def test_ensure_data_for_date_fetches_missing_files(monkeypatch, tmp_path):
     assert "OFEI" not in fetched, "OFEI should not be re-fetched"
     # Exactly the 5 missing types should be fetched
     assert set(fetched) == {"dCondIniU", "dCondIniP", "PrId", "iMAR", "dAGCUNIDAD"}
+
+
+def test_save_file_raises_and_writes_nothing_on_http_error(tmp_path, monkeypatch):
+    import pytest
+
+    class _Err(_FakeResponse):
+        status_code = 404
+
+    monkeypatch.setattr("app.data.download.requests.get", lambda *a, **k: _Err(b"Not found"))
+    storage = LocalStorage(str(tmp_path))
+    with pytest.raises(RuntimeError, match="HTTP 404"):
+        save_file(file_type="OFEI", file_date=date(2024, 4, 18), storage=storage)
+    assert not (tmp_path / "2024-04-18" / "OFEI0418.txt").exists()

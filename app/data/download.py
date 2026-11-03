@@ -50,6 +50,11 @@ def save_file(file_type: str, file_date: date, storage: Storage) -> None:
             "nombreBlobContainer": XM_BLOB_CONTAINER,
         },
     )
+    status = getattr(response, "status_code", 200)
+    if status >= 400:
+        # Don't persist an error body as if it were the published file: a later
+        # `storage.exists` check would then treat it as present and block retries.
+        raise RuntimeError(f"XM download failed for {filename_}.txt (HTTP {status})")
     with storage.open(f"{file_date}/{filename_}.txt", "w") as file:
         file.write(response.content.decode("utf-8"))
 

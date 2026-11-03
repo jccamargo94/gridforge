@@ -6,7 +6,16 @@ and 69), so that resource had three initial-condition rows and `Ton` could not b
 built ("Invalid parameter value: Ton[MERILECTRICA 1] = 'Recurso ...'").
 """
 
-from app.pipeline.case_builder import _map_condicion_inicial_names
+import shutil
+from datetime import date
+from pathlib import Path
+
+from app.pipeline.case_builder import _map_condicion_inicial_names, build_case
+from app.schemas.case import DispatchCase, DispatchLevel
+from app.schemas.input_pack import InputPack, InputSource
+
+DD = str(Path(__file__).parent / "fixtures" / "xm_smoke")
+FECHA = date(2024, 4, 18)
 
 
 def _map(names, choices, overrides=None):
@@ -35,3 +44,23 @@ def test_plants_absent_from_availability_are_not_forced_onto_a_lookalike():
 def test_overrides_win_even_with_a_low_fuzzy_score():
     got = _map(["FLORES IV", "TERMO1"], ["TERMO1"], overrides={"FLORES IV": "FLORES 4 CC"})
     assert got == {"TERMO1": "TERMO1", "FLORES IV": "FLORES 4 CC"}
+
+
+def test_build_case_ignores_unmatched_on_plant_instead_of_duplicating_a_resource(tmp_path):
+    """End to end on the xm_smoke fixture: an ON plant ("TERMO1XYZ", Gpini != 0) that is
+    absent from the availability data scores ~80 against TERMO1. Without the cutoff it
+    was mapped onto TERMO1, giving that resource two initial-condition rows and
+    breaking the `Ton` parameter (same failure as MERILECTRICA 1 on 2026-10-27)."""
+    shutil.copytree(DD, tmp_path, dirs_exist_ok=True)
+    extra = "TERMO1XYZ, 0, 0, 0, 1, 0, 150,  - , 150.0000, 150.0000, 0, 0, 10, 0, 5, 0, 5, 0\n"
+    for p in tmp_path.rglob("dCondIniP0418.txt"):
+        p.write_text(p.read_text().rstrip("\n") + "\n" + extra)
+
+    case = DispatchCase(dispatch_date=FECHA, level=DispatchLevel.ideal)
+    inputs = InputPack(dispatch_date=FECHA, source=InputSource.historical, data_dir=str(tmp_path))
+    set_data, param_data, meta = build_case(case, inputs)
+
+    assert "TERMO1XYZ" not in set(set_data["I"])
+    init = meta["initial_condition_df"]
+    assert list(init["Recurso"]).count("TERMO1") == 1
+    assert "TERMO1XYZ" not in set(init["Recurso"])

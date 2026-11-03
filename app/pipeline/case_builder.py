@@ -25,6 +25,7 @@ from app.data.heuristic.biddings import ensure_ofertas_estimado
 from app.data.ofei import parse_ofei
 from app.data.paths import resolve_input
 from app.data.xm_bulk import ensure_bulk_data_for_year
+from app.pipeline.prid_unmodeled import prid_unmodeled_mw
 from app.schemas.bess import BessScenario
 from app.schemas.case import DispatchCase, DispatchLevel
 from app.schemas.input_pack import InputPack
@@ -536,6 +537,25 @@ def build_case(
         if (case.level == DispatchLevel.preideal or demand_fallback_prid)
         else (demanda.set_index("datetime")["dema"] * 1e-3).astype(int)
     )
+
+    # Plantas que XM despacha en PrId pero que no tienen disponibilidad (no estan en
+    # el modelo): su energia se descuenta de la demanda para no inflar el faltante.
+    unmodeled_hours, unmodeled_detail = prid_unmodeled_mw(
+        prid_path, dispo["resource_name"].unique()
+    )
+    if unmodeled_detail:
+        print(
+            f"WARNING: {len(unmodeled_detail)} plantas de PrId sin disponibilidad para "
+            f"{DISPATCH_DATE} (hasta {max(unmodeled_hours):.0f} MW/h); se tratan como "
+            f"generacion fija y se descuentan de la demanda: {sorted(unmodeled_detail)}"
+        )
+        is_dict = isinstance(DEMANDA, dict)
+        dem_series = pd.Series(DEMANDA).sort_index()
+        offset = pd.Series(unmodeled_hours[: len(dem_series)], index=dem_series.index)
+        dem_series = (dem_series - offset).clip(lower=0)
+        if not is_dict and case.level != DispatchLevel.preideal and not demand_fallback_prid:
+            dem_series = dem_series.round().astype(int)
+        DEMANDA = dem_series.to_dict() if is_dict else dem_series
     MAX_MIN_OP = 1 if case.level == DispatchLevel.preideal else 0
     TMG = (
         parametros_plantas[parametros_plantas["generador"].isin(fuel_generators)]

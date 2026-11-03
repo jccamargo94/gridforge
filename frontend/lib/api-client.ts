@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { ChartSeriesRow, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
+import type { ChartSeriesRow, MeritPositionResponse, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -34,6 +34,11 @@ export function getRun(id: string): Promise<RunDetail> {
 
 export function getChartSeries(days: number): Promise<ChartSeriesRow[]> {
   return request<ChartSeriesRow[]>(`/chart/series?days=${days}`);
+}
+
+export function getMeritPosition(date: string, own: string[]): Promise<MeritPositionResponse> {
+  const q = new URLSearchParams({ date, own: own.join(",") });
+  return request<MeritPositionResponse>(`/market/merit-position?${q.toString()}`);
 }
 
 export function createRun(body: CreateRunRequest): Promise<{ run_id: string; status: string }> {

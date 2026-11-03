@@ -582,3 +582,21 @@ def post_offer_audit(body: OfferAuditRequest, user_id: str = Depends(get_current
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="no offer history for that date") from exc
+
+
+@app.get("/market/marginal-map")
+def get_marginal_map(
+    start: date,
+    end: date,
+    tol: float = 0.02,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Share of days each technology (and zone, if the topology was scraped)
+    was a price-setting candidate, by hour, from observed spot price + offers.
+    Never returns resource names."""
+    try:
+        return market_service.marginal_map(start, end, tol)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="no market data for that range") from exc

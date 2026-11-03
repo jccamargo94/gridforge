@@ -275,3 +275,19 @@ export interface OfferToAudit {
   resource: string;
   price_cop_mwh: number | null;
 }
+
+export interface MarginalCell {
+  gen_type: string;
+  zone: string | null;
+  hour: number;
+  share: number;
+}
+
+export interface MarginalMapResponse {
+  tol: number;
+  n_hours: number;
+  attributed_share: number;
+  ambiguous_share: number;
+  zone_mapped_share: number | null;
+  cells: MarginalCell[];
+}

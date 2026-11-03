@@ -3,13 +3,15 @@ two calendar years) and delegate to app.market.merit."""
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import date, timedelta
 
 import pandas as pd
 
 from app.data import loaders
-from app.market import merit, offer_audit
+from app.market import marginal, merit, offer_audit
+from app.storage import get_storage
 
 MAX_RANGE_DAYS = 92
 
@@ -71,3 +73,35 @@ def audit_offers(day: date, offers: list[tuple[str, float | None]], window_days:
         raise ValueError("window_days must be 7..365")
     history = load_offer_history(day - timedelta(days=window_days), day)
     return [offer_audit.audit_offer(history, r, day, p, window_days) for r, p in offers]
+
+
+MAX_MARGINAL_DAYS = 366
+# Same cache file POST /topology/scrape writes (services/api/main.py).
+TOPOLOGY_NETWORK_PATH = "topology/network.json"
+
+
+def _zone_by_resource() -> dict[str, str]:
+    """resource -> zone from the cached PARATEC network; {} when not scraped yet."""
+    storage = get_storage(data_dir())
+    if not storage.exists(TOPOLOGY_NETWORK_PATH):
+        return {}
+    with storage.open(TOPOLOGY_NETWORK_PATH) as fh:
+        network = json.load(fh)
+    return {g["name"]: g["zone"] for g in network.get("generators", []) if g.get("zone")}
+
+
+def marginal_map(start: date, end: date, tol: float) -> dict:
+    if end < start or (end - start).days + 1 > MAX_MARGINAL_DAYS:
+        raise ValueError(f"range must be 1..{MAX_MARGINAL_DAYS} days")
+    if not 0.0 <= tol <= 0.2:
+        raise ValueError("tol must be between 0 and 0.2")
+    dispo, ofertas, _ = _load(start, end)
+    dd = data_dir()
+    spot = pd.concat(
+        [loaders.load_precio_bolsa(dd, y) for y in _years(start, end)], ignore_index=True
+    )
+    lo, hi = pd.Timestamp(start), pd.Timestamp(end) + pd.Timedelta(days=1)
+    spot = spot[(spot["datetime"] >= lo) & (spot["datetime"] < hi)]
+    return marginal.marginal_map(
+        dispo, ofertas, spot, tol=tol, zone_by_resource=_zone_by_resource()
+    )

@@ -80,3 +80,27 @@ def test_public_run_detail_log_and_artifact_available_to_any_user(api_client, tm
     assert api_client.get(f"/runs/{run_id}").status_code == 200
     assert api_client.get(f"/runs/{run_id}/log").status_code == 200
     assert api_client.get(f"/runs/{run_id}/prices").status_code == 200
+
+
+def test_create_run_thermal_real_generation_roundtrip(api_client):
+    resp = api_client.post(
+        "/runs",
+        json={"dispatch_date": "2024-04-18", "level": "ideal", "thermal_real_generation": True},
+    )
+    assert resp.status_code == 200
+    body = api_client.get(f"/runs/{resp.json()['run_id']}").json()
+    assert body["thermal_real_generation"] is True
+
+
+def test_create_run_thermal_real_generation_defaults_false(api_client):
+    resp = api_client.post("/runs", json={"dispatch_date": "2024-04-18", "level": "ideal"})
+    body = api_client.get(f"/runs/{resp.json()['run_id']}").json()
+    assert body["thermal_real_generation"] is False
+
+
+def test_create_run_thermal_real_generation_rejects_non_ideal(api_client):
+    resp = api_client.post(
+        "/runs",
+        json={"dispatch_date": "2024-04-18", "level": "preideal", "thermal_real_generation": True},
+    )
+    assert resp.status_code == 400

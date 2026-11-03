@@ -87,6 +87,7 @@ class RunCreateRequest(BaseModel):
     scenario_id: str | None = None
     nodal_network: NodalNetwork | None = None
     recompute_demand_shares: bool = False
+    thermal_real_generation: bool = False
 
 
 def _run_summary(run, case) -> dict:
@@ -102,6 +103,7 @@ def _run_summary(run, case) -> dict:
         "error": run.error,
         "visibility": run.visibility,
         "input_grade": run.input_grade,
+        "thermal_real_generation": case.thermal_real_generation,
     }
 
 
@@ -204,6 +206,10 @@ def create_run(
         raise HTTPException(status_code=404, detail="scenario not found")
     if body.nodal_network is not None and body.level != DispatchLevel.lmp:
         raise HTTPException(status_code=400, detail="nodal_network is only valid for level lmp")
+    if body.thermal_real_generation and body.level != DispatchLevel.ideal:
+        raise HTTPException(
+            status_code=400, detail="thermal_real_generation is only valid for level ideal"
+        )
     if body.recompute_demand_shares and body.nodal_network is None:
         raise HTTPException(
             status_code=400, detail="recompute_demand_shares requires nodal_network"
@@ -234,6 +240,7 @@ def create_run(
         level=body.level.value,
         solver=body.solver,
         compute_prices=body.compute_prices,
+        thermal_real_generation=body.thermal_real_generation,
         scenario_id=body.scenario_id,
         user_id=user_id,
         nodal_network=nodal_network_dict,

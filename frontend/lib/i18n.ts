@@ -204,6 +204,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "createRun.nodalNetworkHelp": "Red de transmision para analisis nodal (requerida para nivel lmp)",
     "createRun.nodalNetworkRequired": "Seleccione o cargue una red nodal",
     "createRun.recomputeDemandShares": "Calcular demand-share por fecha",
+    "createRun.thermalRealGeneration": "Fijar térmicas a su generación real",
+    "createRun.thermalRealGenerationTooltip": "Solo nivel ideal (dato ex post). Descarga la generación real (Gene) de XM y fija las térmicas a lo que realmente generaron, para reflejar inflexibilidades que el precio ideal no remunera. Reduce el WAPE ex-ΔI en promedio, pero puede empeorar días de pico caro. Requiere fecha ya consolidada por XM.",
     "createRun.recomputeDemandSharesTooltip": "Recalcula la proporcion de demanda por zona usando la demanda real de la fecha de despacho (dDEM historico o pronostico PRON), en vez del promedio guardado al momento del scrape. Agrega tiempo a la creacion de la corrida porque descarga el archivo de demanda de esa fecha.",
 
     "nodalNetwork.example": "Cargar red de ejemplo",
@@ -598,6 +600,8 @@ const dict: Record<Lang, Record<string, string>> = {
     "createRun.nodalNetworkHelp": "Transmission network for nodal analysis (required for lmp level)",
     "createRun.nodalNetworkRequired": "Select or load a nodal network",
     "createRun.recomputeDemandShares": "Compute demand share by date",
+    "createRun.thermalRealGeneration": "Fix thermals to real generation",
+    "createRun.thermalRealGenerationTooltip": "Ideal level only (ex post data). Downloads XM real generation (Gene) and fixes thermal plants to what they actually generated, reflecting inflexibilities the ideal price does not remunerate. Lowers ex-ΔI WAPE on average but can worsen expensive-peak days. Requires a date already consolidated by XM.",
     "createRun.recomputeDemandSharesTooltip": "Recomputes the per-zone demand share using the actual demand for the dispatch date (historical dDEM or forecast PRON), instead of the average saved at scrape time. Adds time to run creation because it downloads that date's demand file.",
 
     "nodalNetwork.example": "Load example network",

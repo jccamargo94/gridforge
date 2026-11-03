@@ -126,6 +126,7 @@ export interface CreateRunRequest {
   scenario_id?: string | null;
   nodal_network?: NodalNetwork | null;
   recompute_demand_shares?: boolean;
+  thermal_real_generation?: boolean;
 }
 
 export interface NodalSummary {

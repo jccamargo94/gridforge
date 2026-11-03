@@ -137,4 +137,22 @@ describe("CreateRunForm", () => {
       expect(createRun).toHaveBeenCalledWith(expect.objectContaining({ nodal_network: null }))
     );
   });
+
+  it("sends thermal_real_generation true when the checkbox is checked for an ideal run", async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CreateRunForm onCreated={vi.fn()} />);
+
+    expect(screen.queryByRole("checkbox", { name: /generación real/i })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/fecha/i), { target: { value: "2024-04-18" } });
+    await user.click(screen.getByRole("combobox", { name: /nivel/i }));
+    await user.click(await screen.findByRole("option", { name: "ideal" }));
+    await user.click(screen.getByRole("checkbox", { name: /generación real/i }));
+    await user.click(screen.getByRole("button", { name: /crear ejecucion/i }));
+
+    await waitFor(() =>
+      expect(createRun).toHaveBeenCalledWith(
+        expect.objectContaining({ level: "ideal", thermal_real_generation: true })
+      )
+    );
+  });
 });

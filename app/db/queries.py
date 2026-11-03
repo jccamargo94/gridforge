@@ -63,12 +63,14 @@ def create_case_and_run(
     nodal_network: dict | None = None,
     visibility: str = "private",
     input_grade: str | None = None,
+    thermal_real_generation: bool = False,
 ) -> Run:
     case = Case(
         dispatch_date=dispatch_date,
         level=level,
         solver=solver,
         compute_prices=compute_prices,
+        thermal_real_generation=thermal_real_generation,
         scenario_id=scenario_id,
         nodal_network=nodal_network,
     )

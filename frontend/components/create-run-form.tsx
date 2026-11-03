@@ -34,6 +34,7 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
   const [scenarioId, setScenarioId] = useState("");
   const [network, setNetwork] = useState<NodalNetwork | null>(null);
   const [recomputeDemandShares, setRecomputeDemandShares] = useState(false);
+  const [thermalRealGeneration, setThermalRealGeneration] = useState(false);
   const router = useRouter();
   const t = useT();
 
@@ -55,6 +56,7 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
       scenario_id: scenarioId || null,
       nodal_network: level === "lmp" ? network : null,
       recompute_demand_shares: level === "lmp" ? recomputeDemandShares : false,
+      thermal_real_generation: level === "ideal" ? thermalRealGeneration : false,
     });
   }
 
@@ -187,6 +189,27 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
             />
             {t("createRun.recomputeDemandShares")}
             <span title={t("createRun.recomputeDemandSharesTooltip")}>
+              <Info className="size-3.5 text-muted-foreground" />
+            </span>
+          </label>
+        </div>
+      )}
+
+      {level === "ideal" && (
+        <div>
+          <label
+            htmlFor="thermal_real_generation"
+            className="flex items-center gap-2 text-sm text-muted-foreground"
+          >
+            <input
+              type="checkbox"
+              id="thermal_real_generation"
+              checked={thermalRealGeneration}
+              onChange={(e) => setThermalRealGeneration(e.target.checked)}
+              className="size-3.5"
+            />
+            {t("createRun.thermalRealGeneration")}
+            <span title={t("createRun.thermalRealGenerationTooltip")}>
               <Info className="size-3.5 text-muted-foreground" />
             </span>
           </label>

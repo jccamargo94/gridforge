@@ -32,7 +32,8 @@ FLAT_TOLERANCE = 0.005
 
 def _flag(price: float, hist: np.ndarray) -> tuple[str, float | None]:
     mean, std = float(hist.mean()), float(hist.std(ddof=1)) if len(hist) > 1 else 0.0
-    if std == 0.0:
+    # A constant history can give a ~1e-14 std from float noise; treat it as flat.
+    if std <= 1e-9 * max(abs(mean), 1.0):
         moved = abs(price - mean) > FLAT_TOLERANCE * max(abs(mean), 1e-9)
         return ("changed" if moved else "ok"), None
     z = (price - mean) / std

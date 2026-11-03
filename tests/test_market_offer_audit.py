@@ -76,3 +76,13 @@ def test_same_weekday_band_needs_enough_samples():
     prices = [100 + (i % 3) for i in range(60)]
     out = offer_audit.audit_offer(_hist(prices), "TERMO1", DAY, 101_000.0, window_days=60)
     assert out["same_weekday"] is not None and out["same_weekday"]["n"] >= 4
+
+
+def test_flat_history_with_float_noise_is_flat_not_zscore():
+    hist = pd.DataFrame(
+        {"Date": pd.date_range("2026-10-01", periods=20), "resource_name": "A", "Value": 0.1234567}
+    )
+    same = offer_audit.audit_offer(hist, "A", date(2026, 10, 25), 0.1234567 * 1e3)
+    assert same["flag"] == "ok" and same["z"] is None
+    moved = offer_audit.audit_offer(hist, "A", date(2026, 10, 25), 0.1234567 * 1e3 * 1.05)
+    assert moved["flag"] == "changed" and moved["z"] is None

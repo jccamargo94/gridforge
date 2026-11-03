@@ -10,6 +10,7 @@ corto por esos MW. Como el escalon entre la oferta barata y la termica es de
 """
 
 import csv
+import re
 
 from thefuzz import fuzz, process
 
@@ -22,13 +23,25 @@ def _norm(name: str) -> str:
     return name.strip().lower().replace(" ", "")
 
 
+def _ident(name: str) -> tuple[str, frozenset[str]]:
+    """Identificador de una planta: ultimo token y tokens con digitos.
+
+    Evita que hermanas numeradas ("... 4" vs "... 5", "ESCOBAL I" vs "II",
+    "BSLI" vs "BSLII"), que el fuzzy puntua >= 90, se confundan entre si.
+    """
+    toks = [t for t in re.split(r"[\s\-]+", name.strip().lower()) if t]
+    return (toks[-1] if toks else "", frozenset(t for t in toks if any(c.isdigit() for c in t)))
+
+
 def prid_unmodeled_mw(prid_path: str, known_names, *, encoding: str = "latin1"):
     """(MW por hora [24], {planta: MW totales del dia}) de plantas de PrId sin recurso conocido.
 
     Una planta cuenta como conocida si coincide exacta (sin espacios/mayusculas) o
-    con `token_sort_ratio >= MATCH_CUTOFF` con algun nombre de `known_names`.
+    con `token_sort_ratio >= MATCH_CUTOFF` con algun nombre de `known_names` Y el mismo
+    identificador (ultimo token y numeros), para no absorber plantas hermanas.
     """
-    known = {_norm(n) for n in known_names if isinstance(n, str)}
+    raw = {_norm(n): n for n in known_names if isinstance(n, str)}
+    known = set(raw)
     known_list = sorted(known)
     hours = [0.0] * 24
     detail: dict[str, float] = {}
@@ -43,8 +56,10 @@ def prid_unmodeled_mw(prid_path: str, known_names, *, encoding: str = "latin1"):
             key = _norm(name)
             if key in _AGGREGATE_ROWS or key in known:
                 continue
-            if known_list and process.extractOne(
-                key, known_list, scorer=_scorer, score_cutoff=MATCH_CUTOFF
+            if known_list and any(
+                _ident(raw[cand]) == _ident(name)
+                for cand, score in process.extract(key, known_list, scorer=_scorer, limit=5)
+                if score >= MATCH_CUTOFF
             ):
                 continue
             detail[name] = sum(vals)

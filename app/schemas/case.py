@@ -19,3 +19,6 @@ class DispatchCase(BaseModel):
     solver: str = "cbc"
     compute_prices: bool = True
     nodal_network: str | None = None
+    # Solo nivel ideal: fija las termicas a su generacion real (Gene) como
+    # inflexibilidades (ver app/pipeline/thermal_fix.py). Dato ex post.
+    thermal_real_generation: bool = False

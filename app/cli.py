@@ -74,6 +74,11 @@ def run(
         "--bess-scenario",
         help="named scenario (scenarios/bess/<name>.yaml) or path to a scenario YAML",
     ),
+    thermal_real_generation: bool = typer.Option(
+        False,
+        "--thermal-real-generation",
+        help="ideal only: fix thermals to their real generation (XM Gene) as inflexibilities",
+    ),
     skip_dates: str = typer.Option("", help="comma-separated YYYY-MM-DD to skip"),
     out: str = typer.Option("data/results", help="results directory"),
     data_dir: str = typer.Option("data", help="input data directory"),
@@ -97,6 +102,7 @@ def run(
             compute_prices=prices,
             bess_scenario=scenario,
             nodal_network=nodal_network,
+            thermal_real_generation=thermal_real_generation and lvl == DispatchLevel.ideal,
         )
         for d in selected
         for lvl in levels

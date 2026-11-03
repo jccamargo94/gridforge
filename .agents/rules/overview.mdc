@@ -80,6 +80,15 @@ nativo esta disponible.
   sinteticos con formato real XM (Fase 2B) — pero sigue sin validar contra
   datos historicos reales descargados de XM. No afirme "funciona con datos
   reales" solo porque los tests de fixture pasan.
+- **`thermal_real_generation`** (solo nivel `ideal`, opt-in, `--thermal-real-generation`
+  en el CLI): fija las termicas (gen_type TERMICA, oferta > 125.000 COP/MWh) a su
+  generacion real (`Gene`, cache `gene/gene_<fecha>.csv`) descontandola de la demanda y
+  del Pmax horario (la oferta queda intacta para la disponibilidad restante). Emula la
+  exclusion de inflexibilidades del precio ideal. 29 fechas reales 2026: WAPE medio sin
+  dI 11,21 -> 7,09 (20 mejoran, 8 empeoran: dias caros de punta, donde la generacion
+  real incluye energia economica). `PrId` no sirve como sustituto (el preideal ignora
+  inflexibilidades). Requiere fecha consolidada en XM. No expuesto en la API (la columna
+  de `cases` en DB no existe todavia). Ver issue #63.
 - **`thefuzz` guards**: `price_bid_map`, `CC_MAP`, `generators_pap_map` en
   `case_builder.py` usan `extractOne(..., score_cutoff=70)[0]` — un match
   bajo 70 revienta `TypeError` sobre `None`. Nombres de recurso deben ser

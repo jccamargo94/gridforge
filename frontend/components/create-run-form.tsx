@@ -30,7 +30,7 @@ import {
 export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
   const [dispatchDate, setDispatchDate] = useState("");
   const [level, setLevel] = useState<DispatchLevel>("preideal");
-  const [solver, setSolver] = useState("cbc");
+  const [solver, setSolver] = useState("appsi_highs");
   const [scenarioId, setScenarioId] = useState("");
   const [network, setNetwork] = useState<NodalNetwork | null>(null);
   const [recomputeDemandShares, setRecomputeDemandShares] = useState(false);
@@ -114,10 +114,8 @@ export function CreateRunForm({ onCreated }: { onCreated: () => void }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="appsi_highs">HiGHS</SelectItem>
               <SelectItem value="cbc">CBC</SelectItem>
-              <SelectItem value="highs" disabled>
-                HiGHS ({t("createRun.comingSoon")})
-              </SelectItem>
             </SelectContent>
           </Select>
           <p className="text-[0.7rem] text-muted-foreground">

@@ -83,7 +83,10 @@ def run_nodal(
                 "generators": build_generator_costs(net, case.dispatch_date, data_dir),
             }
         )
-        sol = EgretNodalEngine().solve(net, solver=case.solver)
+        # Egret no puede manejar HiGHS (appsi_highs es un LegacySolver sin `.name`;
+        # `highs` no esta disponible): el camino nodal sigue en cbc.
+        nodal_solver = "cbc" if case.solver in ("appsi_highs", "highs") else case.solver
+        sol = EgretNodalEngine().solve(net, solver=nodal_solver)
         a = settle_status_quo(sol)
         b = settle_lmp(sol)
         comparison = compare_settlements(a, b, sol)

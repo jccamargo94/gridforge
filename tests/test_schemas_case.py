@@ -7,7 +7,7 @@ from app.schemas.case import DispatchCase, DispatchLevel
 def test_case_without_bess():
     c = DispatchCase(dispatch_date=date(2024, 4, 18), level=DispatchLevel.preideal)
     assert c.bess_scenario is None
-    assert c.solver == "cbc"
+    assert c.solver == "appsi_highs"
     assert c.compute_prices is True
 
 

@@ -64,7 +64,7 @@ def run(
         "-t",
         help="dispatch level (preideal/ideal/lmp), repeatable, or 'all'",
     ),
-    solver: str = typer.Option("cbc", help="pyomo solver name"),
+    solver: str = typer.Option("appsi_highs", help="pyomo solver name (appsi_highs | cbc)"),
     eval: bool = typer.Option(True, "--eval/--no-eval", help="evaluate vs XM actuals"),
     prices: bool = typer.Option(
         True, "--prices/--no-prices", help="fix-integers LP pricing re-solve"

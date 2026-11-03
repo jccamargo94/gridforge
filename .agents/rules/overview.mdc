@@ -46,15 +46,16 @@ fases: [`docs/roadmap-aplicacion-despacho.md`](../../docs/roadmap-aplicacion-des
     No dejar que un resolver lo mueva sin re-verificar.
   - `numpy==1.26.4` (`numpy<2`) — Pyomo 6.7.3 usa `np.float_`, removido en
     NumPy 2.0; sin este pin, `import pyomo.environ` falla en seco.
-  - Solver default es **`cbc`** (apt `coinor-cbc`). **`appsi_highs`** (HiGHS via
-    `highspy`, pip puro) tambien funciona desde la fase 10A y da precios y
-    despacho identicos a `cbc` (verificado en el fixture y en un dia real,
-    2026-10-20, preideal e ideal: diferencia < 1e-10 COP/MWh). Antes fallaba en
-    *todo* solve con "Solver does not currently have valid duals" por dos causas:
-    el `Suffix` de duales se importaba tras el MILP, y el LP de precios dejaba las
-    binarias fijas como enteras (HiGHS lo resolvia como MIP, sin duales). Ahora
-    `model.py` mantiene el suffix `LOCAL` en el MILP y relaja las binarias fijas a
-    `Reals` solo durante el LP de precios. Usar `--solver appsi_highs`.
+  - Solver default es **`appsi_highs`** (HiGHS via `highspy`, pip puro; default desde la
+    fase 11E). Da precios y despacho identicos a `cbc` (fixture y 14/14 fechas reales:
+    diferencia < 1e-10 COP/MWh) **solo porque `model.py` fuerza `mip_rel_gap=0.0`**: el gap
+    por defecto de HiGHS (1e-4) cambia precios hasta 186k COP/MWh. `model.py` mantiene el
+    suffix de duales `LOCAL` en el MILP y relaja las binarias fijas a `Reals` solo durante
+    el LP de precios (sin eso HiGHS falla con "no valid duals"). **`cbc`** (apt
+    `coinor-cbc`) sigue disponible con `--solver cbc` y es **obligatorio en el camino
+    nodal/Egret** (`lmp`): Egret no maneja HiGHS (`appsi_highs` es un LegacySolver sin
+    `.name`, `highs` no esta disponible), por eso `app/nodal/runner.py` mapea HiGHS->cbc y
+    las imagenes Docker siguen instalando `coinor-cbc`.
 - Pre-commit: `ruff` (lint+format) **bloqueante**; `ty` **informativo**
   (`stages: [manual]`, no bloquea commits — el repo nunca paso por un
   type-checker, correrlo bloqueante ahora bloquearia todo).

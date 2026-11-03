@@ -45,7 +45,7 @@ class Case(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_new_id)
     dispatch_date: Mapped[date_] = mapped_column(Date, nullable=False)
     level: Mapped[str] = mapped_column(String, nullable=False)
-    solver: Mapped[str] = mapped_column(String, default="cbc")
+    solver: Mapped[str] = mapped_column(String, default="appsi_highs")
     compute_prices: Mapped[bool] = mapped_column(Boolean, default=True)
     scenario_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("scenarios.id"), nullable=True

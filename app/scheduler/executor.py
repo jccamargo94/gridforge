@@ -135,7 +135,7 @@ def execute_plan(
         session,
         dispatch_date=plan.target_date,
         level=level.value,
-        solver="cbc",
+        solver="appsi_highs",
         compute_prices=True,
         scenario_id=None,
         user_id=None,

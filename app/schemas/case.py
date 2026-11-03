@@ -16,7 +16,7 @@ class DispatchCase(BaseModel):
     dispatch_date: date
     level: DispatchLevel
     bess_scenario: BessScenario | None = None
-    solver: str = "cbc"
+    solver: str = "appsi_highs"
     compute_prices: bool = True
     nodal_network: str | None = None
     # Solo nivel ideal: fija las termicas a su generacion real (Gene) como

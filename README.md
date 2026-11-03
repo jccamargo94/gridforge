@@ -42,7 +42,7 @@ Runs with zero external data or credentials — CLI, model, and tests work
 against the repo's synthetic fixture out of the box:
 
 ```bash
-sudo apt-get install coinor-cbc      # solver used by the Pyomo model
+sudo apt-get install coinor-cbc      # optional: --solver cbc and the nodal (lmp) path; default solver is HiGHS (highspy, pip)
 uv sync --group dev
 uv run pytest -q                     # 138 tests, no external data needed
 ```
@@ -254,8 +254,9 @@ docker/
 ## 6. Instalacion local
 
 Requiere Python 3.12 (gestionado via `uv python install 3.12`, ver
-`.python-version`) y un solver compatible con Pyomo. El flujo documentado
-usa **CBC** en el `PATH`.
+`.python-version`). El solver por defecto es **HiGHS** (`highspy`, se instala con
+`uv sync`). **CBC** en el `PATH` es opcional (`--solver cbc`) pero obligatorio para el
+nivel nodal `lmp`.
 
 En Debian/Ubuntu:
 
@@ -430,7 +431,7 @@ Opciones utiles:
 | opcion | default | significado |
 | --- | --- | --- |
 | `-t, --type` | `preideal` | Tipo de despacho. Es repetible. `all` ejecuta todos los tipos. |
-| `--solver` | `cbc` | Solver Pyomo. |
+| `--solver` | `appsi_highs` | Solver Pyomo (`appsi_highs` o `cbc`; el nivel `lmp` usa siempre `cbc`). |
 | `--eval/--no-eval` | eval | Calcula metricas contra XM cuando hay datos reales. |
 | `--prices/--no-prices` | prices | Ejecuta o salta el LP de pricing. Sin pricing, el MPO no es confiable. |
 | `--skip-dates` | vacio | Fechas `YYYY-MM-DD` separadas por coma para omitir. |

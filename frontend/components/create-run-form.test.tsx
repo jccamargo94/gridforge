@@ -42,26 +42,25 @@ describe("CreateRunForm", () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
   });
 
-  it("submits with the default solver (cbc)", async () => {
+  it("submits with the default solver (appsi_highs)", async () => {
     renderWithQueryClient(<CreateRunForm onCreated={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/fecha/i), { target: { value: "2024-04-18" } });
     fireEvent.click(screen.getByRole("button", { name: /crear ejecucion/i }));
 
     await waitFor(() =>
-      expect(createRun).toHaveBeenCalledWith(expect.objectContaining({ solver: "cbc" }))
+      expect(createRun).toHaveBeenCalledWith(expect.objectContaining({ solver: "appsi_highs" }))
     );
   });
 
-  it("renders the HiGHS solver option as disabled", async () => {
+  it("offers HiGHS and CBC as enabled solver options", async () => {
     const user = userEvent.setup();
     renderWithQueryClient(<CreateRunForm onCreated={vi.fn()} />);
 
-    const solverTrigger = screen.getByRole("combobox", { name: /solver/i });
-    await user.click(solverTrigger);
+    await user.click(screen.getByRole("combobox", { name: /solver/i }));
 
-    const highsItem = screen.getByRole("option", { name: /highs/i });
-    expect(highsItem).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("option", { name: /highs/i })).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("option", { name: /cbc/i })).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("offers the lmp level option", async () => {

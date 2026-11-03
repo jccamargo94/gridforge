@@ -325,12 +325,23 @@ class UnitCommitmentModel:
         dual of a MILP is not a meaningful marginal price; this fix-and-resolve
         is the standard ISO pricing run.
         """
-        model_solver = pyo.SolverFactory(solver, **kwargs)
-        results = model_solver.solve(
-            self._model,
-            options=solver_params,
-            # tee=True
-        )
+        # Duals of a MILP are not marginal prices, and solver interfaces such as
+        # the legacy `appsi_highs` wrapper raise "Solver does not currently have
+        # valid duals" when asked to import them after a MIP solve. Keep the
+        # dual Suffix local (not imported) for the MILP; it is re-enabled for
+        # the pricing LP, the only solve whose duals are used. With
+        # compute_prices=False the Suffix is left untouched (prior behaviour).
+        if compute_prices:
+            self._model.dual.direction = pyo.Suffix.LOCAL
+        try:
+            model_solver = pyo.SolverFactory(solver, **kwargs)
+            results = model_solver.solve(
+                self._model,
+                options=solver_params,
+                # tee=True
+            )
+        finally:
+            self._model.dual.direction = pyo.Suffix.IMPORT_EXPORT
         if compute_prices:
             self._solve_pricing_lp(solver=solver, solver_params=solver_params, **kwargs)
         return results
@@ -338,18 +349,27 @@ class UnitCommitmentModel:
     def _solve_pricing_lp(self, solver: str = "cbc", solver_params: dict = {}, **kwargs):
         """Fix integers to their MILP solution and re-solve as an LP to obtain
         valid power-balance duals (marginal prices)."""
+        # (var, domain, lb, ub) to restore. Fixing is not enough for solvers that
+        # keep the integrality flag of a fixed variable (HiGHS via appsi solves it
+        # as a MIP and returns no duals); relaxing the domain to Reals while the
+        # variable is fixed makes the pricing solve a true LP for every solver.
         fixed_vars = []
         for var in self._model.component_data_objects(pyo.Var, active=True):
             if var.is_continuous() or var.value is None:
                 continue
+            fixed_vars.append((var, var.domain, var.lb, var.ub))
             var.fix(round(var.value))
-            fixed_vars.append(var)
+            var.domain = pyo.Reals
 
-        model_solver = pyo.SolverFactory(solver, **kwargs)
-        pricing_results = model_solver.solve(self._model, options=solver_params)
-
-        for var in fixed_vars:
-            var.unfix()
+        try:
+            model_solver = pyo.SolverFactory(solver, **kwargs)
+            pricing_results = model_solver.solve(self._model, options=solver_params)
+        finally:
+            for var, domain, lb, ub in fixed_vars:
+                var.unfix()
+                var.domain = domain
+                var.setlb(lb)
+                var.setub(ub)
         return pricing_results
 
     def _create_thermal_feature_constraints(self, set_data: dict, param_data: dict) -> None:

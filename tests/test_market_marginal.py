@@ -77,3 +77,10 @@ def test_zone_mapping_normalizes_names_and_reports_coverage_without_names():
     assert zones == {"HIDRAULICA": "Antioquia", "TERMICA": None}
     assert out["zone_mapped_share"] == 0.5
     assert "SALTO" not in str(out) and "OTRA" not in str(out)
+
+
+def test_missing_gen_type_does_not_break_the_map():
+    res = [("A", None, 300.0, 100_000), ("B", "TERMICA", 300.0, 100_000)]
+    out = marginal.marginal_map(*_frames({D1: 300_000.0, D2: 300_000.0}, res))
+    by_tech = {c["gen_type"]: c["share"] for c in out["cells"] if c["hour"] == 0}
+    assert by_tech == {"SIN_TIPO": 0.5, "TERMICA": 0.5}

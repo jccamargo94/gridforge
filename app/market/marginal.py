@@ -50,6 +50,7 @@ def marginal_map(
 ) -> dict:
     """`precio_bolsa` must already be COP/MWh (loaders.load_precio_bolsa does it)."""
     d = dispo[dispo["dispo"] > 0][["datetime", "resource_name", "gen_type"]].copy()
+    d["gen_type"] = d["gen_type"].fillna("SIN_TIPO")  # NaN would break sorting/JSON
     d["day"] = d["datetime"].dt.normalize()
     o = ofertas.assign(day=ofertas["Date"].dt.normalize())
     o = o.drop_duplicates(["day", "resource_name"], keep="last")

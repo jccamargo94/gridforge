@@ -329,8 +329,10 @@ class UnitCommitmentModel:
         # the legacy `appsi_highs` wrapper raise "Solver does not currently have
         # valid duals" when asked to import them after a MIP solve. Keep the
         # dual Suffix local (not imported) for the MILP; it is re-enabled for
-        # the pricing LP, the only solve whose duals are used.
-        self._model.dual.direction = pyo.Suffix.LOCAL
+        # the pricing LP, the only solve whose duals are used. With
+        # compute_prices=False the Suffix is left untouched (prior behaviour).
+        if compute_prices:
+            self._model.dual.direction = pyo.Suffix.LOCAL
         try:
             model_solver = pyo.SolverFactory(solver, **kwargs)
             results = model_solver.solve(

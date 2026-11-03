@@ -42,3 +42,13 @@ def test_appsi_highs_matches_cbc(level, tmp_path):
     a = disp_cbc.sort_values(key).reset_index(drop=True)
     b = disp_hi.sort_values(key).reset_index(drop=True)
     pd.testing.assert_series_equal(b["dispatch"], a["dispatch"], check_exact=False, atol=1e-6)
+
+
+def test_cbc_without_pricing_keeps_dual_suffix_importing(tmp_path):
+    """compute_prices=False must not change cbc behaviour (price file not empty)."""
+    case = DispatchCase(
+        dispatch_date=FECHA, level=DispatchLevel.preideal, solver="cbc", compute_prices=False
+    )
+    result = run_case(case, evaluate=False, out=str(tmp_path / "np"), data_dir=DD)
+    assert result.ok, result.error
+    assert len(pd.read_csv(result.price_path)) == 24

@@ -9,6 +9,7 @@ from datetime import date
 import pandas as pd
 
 from app.data.actuals import load_reference_price
+from app.pipeline.delta_i import delta_i_metrics
 from app.schemas import DispatchLevel
 from app.storage import get_storage
 from app.utils.metrics import price_metrics
@@ -59,6 +60,8 @@ def evaluate_saved_run(
     xm = load_reference_price(dispatch_date, level=level.value, data_dir=data_dir)
     n = min(len(xm), len(model_mpo))
     metrics = price_metrics(xm[:n], model_mpo[:n])
+    if level in (DispatchLevel.ideal, DispatchLevel.lmp):
+        metrics.update(delta_i_metrics(dispatch_date, xm[:n], model_mpo[:n], data_dir=data_dir))
 
     metrics_name = f"metrics-{dispatch_date}-{t}.csv"
     with storage.open(metrics_name, "w") as f:

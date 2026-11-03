@@ -82,7 +82,7 @@ nativo esta disponible.
   datos historicos reales descargados de XM. No afirme "funciona con datos
   reales" solo porque los tests de fixture pasan.
 - **`thermal_real_generation`** (solo nivel `ideal`, opt-in, `--thermal-real-generation`
-  en el CLI): fija las termicas (gen_type TERMICA, oferta > 125.000 COP/MWh) a su
+  en el CLI y `thermal_real_generation` en `POST /runs`, columna `cases.thermal_real_generation`, API 400 si no es ideal): fija las termicas (gen_type TERMICA, oferta > 125.000 COP/MWh) a su
   generacion real (`Gene`, cache `gene/gene_<fecha>.csv`) descontandola de la demanda y
   del Pmax horario (la oferta queda intacta para la disponibilidad restante). Emula la
   exclusion de inflexibilidades del precio ideal. 29 fechas reales 2026: WAPE medio sin

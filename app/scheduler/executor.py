@@ -44,6 +44,7 @@ def _build_case(session, case_row) -> DispatchCase:
         level=DispatchLevel(case_row.level),
         solver=case_row.solver,
         compute_prices=case_row.compute_prices,
+        thermal_real_generation=case_row.thermal_real_generation,
         bess_scenario=scenario,
     )
 

@@ -47,6 +47,9 @@ class Case(Base):
     level: Mapped[str] = mapped_column(String, nullable=False)
     solver: Mapped[str] = mapped_column(String, default="appsi_highs")
     compute_prices: Mapped[bool] = mapped_column(Boolean, default=True)
+    thermal_real_generation: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("0")
+    )
     scenario_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("scenarios.id"), nullable=True
     )

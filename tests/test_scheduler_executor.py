@@ -111,3 +111,20 @@ def test_execute_plan_settled_run_stamps_reference_at_finish(tmp_path, monkeypat
     assert ms is not None
     assert ms.reference == "iMAR"
     assert ms.evaluated_at is not None
+
+
+def test_build_case_passes_thermal_real_generation_to_dispatch_case():
+    from app.scheduler.executor import _build_case
+
+    session = _session()
+    run = queries.create_case_and_run(
+        session,
+        dispatch_date=FECHA,
+        level="ideal",
+        solver="appsi_highs",
+        compute_prices=True,
+        scenario_id=None,
+        thermal_real_generation=True,
+    )
+    case = _build_case(session, queries.get_case(session, run.case_id))
+    assert case.thermal_real_generation is True

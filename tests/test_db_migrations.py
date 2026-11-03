@@ -233,3 +233,22 @@ def test_alembic_upgrade_head_adds_delta_i_metric_columns(tmp_path):
         "bias_ex_delta",
         "wape_ex_delta",
     }.issubset(columns)
+
+
+def test_alembic_0010_adds_thermal_real_generation_defaulting_false(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'migration_trg.db'}"
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(cfg, "0009")
+    engine = create_engine(database_url)
+    with engine.begin() as conn:
+        conn.exec_driver_sql(
+            "INSERT INTO cases (id, dispatch_date, level, solver, compute_prices) "
+            "VALUES ('c1', '2026-01-01', 'ideal', 'cbc', 1)"
+        )
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        value = conn.exec_driver_sql(
+            "SELECT thermal_real_generation FROM cases WHERE id = 'c1'"
+        ).scalar_one()
+    assert not value

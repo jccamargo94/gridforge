@@ -21,10 +21,12 @@ from thefuzz import fuzz, process
 from app.data import loaders
 from app.data.agc import ensure_agc_asignado
 from app.data.download import ensure_data_for_date
+from app.data.gene import ensure_gene_for_date, load_gene_day
 from app.data.heuristic.biddings import ensure_ofertas_estimado
 from app.data.ofei import parse_ofei
 from app.data.paths import resolve_input
 from app.data.xm_bulk import ensure_bulk_data_for_year
+from app.pipeline.thermal_fix import apply_thermal_real_generation
 from app.schemas.bess import BessScenario
 from app.schemas.case import DispatchCase, DispatchLevel
 from app.schemas.input_pack import InputPack
@@ -589,6 +591,23 @@ def build_case(
         "ramp_down": ramps,
         "max_min_op": MAX_MIN_OP,
     }
+
+    if case.thermal_real_generation:
+        if case.level != DispatchLevel.ideal:
+            raise ValueError("thermal_real_generation solo aplica al nivel ideal (dato ex post)")
+        ensure_gene_for_date(DISPATCH_DATE, dd)
+        gene_mw = load_gene_day(dd, DISPATCH_DATE)
+        gene_mw = gene_mw.assign(gen=gene_mw["gen"] * 1e-3)
+        thermals = dispo.loc[dispo["gen_type"] == "TERMICA", "resource_name"].unique()
+        pmax_fixed, demand_fixed, fixed = apply_thermal_real_generation(
+            param_data["Pmax"], param_data["demand"], beta, thermals, gene_mw
+        )
+        param_data["Pmax"] = pmax_fixed
+        param_data["demand"] = demand_fixed
+        print(
+            f"WARNING: thermal_real_generation activo: {len(fixed)} termicas fijadas a su "
+            f"generacion real (Gene) en {DISPATCH_DATE}: {sorted(fixed)}"
+        )
 
     if case.bess_scenario is not None:
         bess_names, bess_params_model = bess_scenario_to_params(case.bess_scenario)

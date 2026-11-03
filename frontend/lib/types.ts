@@ -210,3 +210,36 @@ export interface NodalSummaryJson {
   metrics: NodalMetrics; totals: NodalSummaryTotals;
   generator_count: number; branch_count: number;
 }
+
+export interface MeritOwnPosition {
+  resource: string;
+  gen_type: string;
+  price_cop_mwh: number;
+  capacity_mw: number;
+  rank: number;
+  cum_ahead_mw: number;
+  in_merit: boolean;
+}
+
+export interface MeritTechAggregate {
+  gen_type: string;
+  n_resources: number;
+  capacity_mw: number;
+  avg_price_cop_mwh: number;
+  in_merit_mw: number;
+}
+
+export interface MeritHour {
+  hour: number;
+  demand_mw: number | null;
+  n_priced: number;
+  clearing_price_cop_mwh: number | null;
+  own: MeritOwnPosition[];
+  market_by_tech: MeritTechAggregate[];
+}
+
+export interface MeritPositionResponse {
+  date: string;
+  unpriced_mw_avg: number;
+  hours: MeritHour[];
+}

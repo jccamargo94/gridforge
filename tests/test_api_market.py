@@ -40,3 +40,44 @@ def test_position_series_endpoint_and_range_cap(api_client, monkeypatch):
         params={"start": "2024-01-01", "end": "2024-12-31", "own": "TERMO1"},
     )
     assert too_long.status_code == 422
+
+
+def test_offer_audit_endpoint_published_and_candidate(api_client, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", DD)
+    resp = api_client.post(
+        "/market/offer-audit",
+        json={
+            "date": "2024-03-20",
+            "window_days": 30,
+            "offers": [
+                {"resource": "TERMO1"},
+                {"resource": "TERMO1", "price_cop_mwh": 900000},
+                {"resource": "NOEXISTE"},
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    published, candidate, missing = resp.json()
+    assert published["price_source"] == "published"
+    assert candidate["price_source"] == "candidate"
+    assert candidate["flag"] in {"changed", "alert"}
+    assert missing["status"] == "no_offer"
+
+
+def test_offer_audit_validates_input(api_client, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", DD)
+    assert (
+        api_client.post(
+            "/market/offer-audit", json={"date": "2024-03-20", "offers": []}
+        ).status_code
+        == 422
+    )
+    bad = api_client.post(
+        "/market/offer-audit",
+        json={"date": "2024-03-20", "window_days": 1, "offers": [{"resource": "X"}]},
+    )
+    assert bad.status_code == 422
+    nodata = api_client.post(
+        "/market/offer-audit", json={"date": "2019-01-01", "offers": [{"resource": "X"}]}
+    )
+    assert nodata.status_code == 404

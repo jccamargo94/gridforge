@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/i18n-context";
 import { cn } from "@/lib/utils";
-import { Gauge, GitCompareArrows, House, Layers, LogOut, Network, Trophy } from "lucide-react";
+import { Gauge, GitCompareArrows, House, Layers, LogOut, Network, ShieldCheck, Trophy } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GridForgeLogoFull } from "@/components/gridforge-logo";
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/scenarios", labelKey: "sidebar.scenarios", icon: Layers },
   { href: "/compare", labelKey: "sidebar.compare", icon: GitCompareArrows },
   { href: "/market", labelKey: "sidebar.market", icon: Trophy },
+  { href: "/offers", labelKey: "sidebar.offerAudit", icon: ShieldCheck },
   { href: "/nodal", labelKey: "sidebar.nodal", icon: Network },
 ] as const;
 

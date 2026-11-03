@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { ChartSeriesRow, MeritPositionResponse, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
+import type { ChartSeriesRow, OfferAuditResult, OfferToAudit, MeritPositionResponse, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -39,6 +39,17 @@ export function getChartSeries(days: number): Promise<ChartSeriesRow[]> {
 export function getMeritPosition(date: string, own: string[]): Promise<MeritPositionResponse> {
   const q = new URLSearchParams({ date, own: own.join(",") });
   return request<MeritPositionResponse>(`/market/merit-position?${q.toString()}`);
+}
+
+export function auditOffers(
+  date: string,
+  offers: OfferToAudit[],
+  windowDays = 90,
+): Promise<OfferAuditResult[]> {
+  return request<OfferAuditResult[]>("/market/offer-audit", {
+    method: "POST",
+    body: JSON.stringify({ date, offers, window_days: windowDays }),
+  });
 }
 
 export function createRun(body: CreateRunRequest): Promise<{ run_id: string; status: string }> {

@@ -243,3 +243,35 @@ export interface MeritPositionResponse {
   unpriced_mw_avg: number;
   hours: MeritHour[];
 }
+
+export type OfferFlag = "ok" | "warn" | "alert" | "changed" | null;
+
+export interface OfferAuditBand {
+  mean_cop_mwh: number;
+  std_cop_mwh: number;
+  p05_cop_mwh: number;
+  p50_cop_mwh: number;
+  p95_cop_mwh: number;
+  min_cop_mwh: number;
+  max_cop_mwh: number;
+}
+
+export interface OfferAuditResult {
+  resource: string;
+  date: string;
+  status: "ok" | "no_offer" | "insufficient_history";
+  price_cop_mwh?: number;
+  price_source?: "published" | "candidate";
+  n_history?: number;
+  flag?: OfferFlag;
+  z?: number | null;
+  band?: OfferAuditBand;
+  percentile_rank?: number;
+  last_offer_cop_mwh?: number;
+  change_vs_last_pct?: number | null;
+}
+
+export interface OfferToAudit {
+  resource: string;
+  price_cop_mwh: number | null;
+}

@@ -108,3 +108,46 @@ def test_marginal_map_validates_range_and_tol(api_client, monkeypatch):
         "/market/marginal-map", params={"start": "2019-01-01", "end": "2019-01-02"}
     )
     assert nodata.status_code == 404
+
+
+def test_availability_check_requires_cached_capacity_then_works(api_client, monkeypatch, tmp_path):
+    import json
+    import shutil
+
+    data = tmp_path / "data"
+    shutil.copytree(DD, data)
+    monkeypatch.setenv("DATA_DIR", str(data))
+    params = {"start": "2024-03-01", "end": "2024-03-10"}
+    assert api_client.get("/market/availability-check", params=params).status_code == 404
+
+    capacity = {
+        "dataReport": [
+            {
+                "name": "Planta térmica",
+                "dispatchedType": [
+                    {
+                        "generatorTypes": [
+                            {"elements": [{"elementName": "Termo1", "netEffectiveCapacity": 100.0}]}
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+    raw = data / "topology" / "raw"
+    raw.mkdir(parents=True)
+    (raw / "capacity.json").write_text(json.dumps(capacity))
+    resp = api_client.get("/market/availability-check", params=params)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["matched"] == 1
+    assert [f["resource"] for f in body["findings"]] == ["TERMO1"]  # fixture declares 300 MW > 100
+
+
+def test_availability_check_validates_params(api_client, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", DD)
+    resp = api_client.get(
+        "/market/availability-check",
+        params={"start": "2024-03-01", "end": "2024-03-10", "low_pct": 2},
+    )
+    assert resp.status_code == 422

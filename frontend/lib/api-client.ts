@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { ChartSeriesRow, MarginalMapResponse, OfferAuditResult, OfferToAudit, MeritPositionResponse, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
+import type { AvailabilityCheckResponse, ChartSeriesRow, MarginalMapResponse, OfferAuditResult, OfferToAudit, MeritPositionResponse, CreateRunRequest, CreateScenarioRequest, DispatchRow, MarginalPlant, NodalArtifactName, RunDetail, RunSummary, Scenario, TopologyNetworkResponse, TopologyScrapeResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -55,6 +55,14 @@ export function auditOffers(
 export function getMarginalMap(start: string, end: string, tol = 0.02): Promise<MarginalMapResponse> {
   const q = new URLSearchParams({ start, end, tol: String(tol) });
   return request<MarginalMapResponse>(`/market/marginal-map?${q.toString()}`);
+}
+
+export function getAvailabilityCheck(
+  start: string,
+  end: string,
+): Promise<AvailabilityCheckResponse> {
+  const q = new URLSearchParams({ start, end });
+  return request<AvailabilityCheckResponse>(`/market/availability-check?${q.toString()}`);
 }
 
 export function createRun(body: CreateRunRequest): Promise<{ run_id: string; status: string }> {

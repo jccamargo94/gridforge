@@ -82,7 +82,7 @@ def list_scenarios_endpoint(
 class RunCreateRequest(BaseModel):
     dispatch_date: date
     level: DispatchLevel
-    solver: str = "cbc"
+    solver: str = "appsi_highs"
     compute_prices: bool = True
     scenario_id: str | None = None
     nodal_network: NodalNetwork | None = None

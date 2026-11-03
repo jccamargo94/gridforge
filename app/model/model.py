@@ -312,7 +312,7 @@ class UnitCommitmentModel:
 
     def solve(
         self,
-        solver: str = "cbc",
+        solver: str = "appsi_highs",
         solver_params: dict = {},
         compute_prices: bool = True,
         **kwargs,
@@ -359,7 +359,7 @@ class UnitCommitmentModel:
             return {"mip_rel_gap": 0.0, **solver_params}
         return solver_params
 
-    def _solve_pricing_lp(self, solver: str = "cbc", solver_params: dict = {}, **kwargs):
+    def _solve_pricing_lp(self, solver: str = "appsi_highs", solver_params: dict = {}, **kwargs):
         """Fix integers to their MILP solution and re-solve as an LP to obtain
         valid power-balance duals (marginal prices)."""
         # (var, domain, lb, ub) to restore. Fixing is not enough for solvers that

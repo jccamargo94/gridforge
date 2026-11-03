@@ -61,6 +61,35 @@ def bess_scenario_to_params(scenario: BessScenario) -> tuple[list[str], dict]:
     return names, params
 
 
+# Minimum fuzzy score to accept a dCondIniP plant name as one of the resources in
+# the availability data. Measured on 1,235 real assignments (29 days of 2026): 1,175
+# were exact and the only legitimate inexact ones score 95-97 ("VILLANUEVA" ->
+# "VILLANUEVA 1", "TERMOCARIBE III" -> "TERMOCARIBE III 1"); wrong ones scored 69-77
+# ("PROELECTRICA 1/2" -> "MERILECTRICA 1" when those plants were not declared that
+# day). Without a cutoff the wrong match made one resource appear three times and the
+# model could not be built.
+INITIAL_CONDITION_MATCH_CUTOFF = 90
+
+
+def _map_condicion_inicial_names(names, choices, overrides: dict[str, str]) -> dict[str, str]:
+    """dCondIniP plant name -> availability resource name. Plants with no match at or
+    above INITIAL_CONDITION_MATCH_CUTOFF are left out (the caller drops them);
+    `overrides` always win and are kept even when the fuzzy score is low."""
+    mapping: dict[str, str] = {}
+    for name in names:
+        match = process.extractOne(
+            query=name.lower(),
+            choices=choices,
+            scorer=fuzz.token_sort_ratio,
+            processor=lambda x: x.lower().replace(" ", ""),
+            score_cutoff=INITIAL_CONDITION_MATCH_CUTOFF,
+        )
+        if match is not None:
+            mapping[name] = match[0]
+    mapping |= overrides
+    return mapping
+
+
 def build_case(
     case: DispatchCase,
     inputs: InputPack,
@@ -235,22 +264,26 @@ def build_case(
         headers = data.pop(0)
     condicion_inicial_unidad = pd.DataFrame(data, columns=headers)
 
-    condicion_inicial_map = {
-        gen: process.extractOne(
-            query=gen.lower(),
-            choices=dispo["resource_name"].unique(),
-            scorer=fuzz.token_sort_ratio,
-            processor=lambda x: x.lower().replace(" ", ""),
-        )[0]
-        for gen in condicion_inicial_planta.Recurso.unique()
-    }
-    condicion_inicial_map |= {
-        "FLORES IV": "FLORES 4 CC",
-        "TSIERRA": "TERMOSIERRA CC",
-        "GUAJIR21": "GUAJIRA 2",
-    }
-    condicion_inicial_planta["Recurso"] = condicion_inicial_planta["Recurso"].apply(
-        lambda x: condicion_inicial_map.get(x, x)
+    condicion_inicial_map = _map_condicion_inicial_names(
+        condicion_inicial_planta.Recurso.unique(),
+        dispo["resource_name"].unique(),
+        overrides={
+            "FLORES IV": "FLORES 4 CC",
+            "TSIERRA": "TERMOSIERRA CC",
+            "GUAJIR21": "GUAJIRA 2",
+        },
+    )
+    unmatched_plants = sorted(set(condicion_inicial_planta.Recurso) - set(condicion_inicial_map))
+    if unmatched_plants:
+        print(
+            f"...plantas de dCondIniP sin recurso equivalente en disponibilidad para "
+            f"{DISPATCH_DATE}, se ignoran: {unmatched_plants}"
+        )
+    condicion_inicial_planta = condicion_inicial_planta[
+        condicion_inicial_planta["Recurso"].isin(condicion_inicial_map)
+    ].copy()
+    condicion_inicial_planta["Recurso"] = condicion_inicial_planta["Recurso"].map(
+        condicion_inicial_map
     )
 
     # --- New CC resources ---

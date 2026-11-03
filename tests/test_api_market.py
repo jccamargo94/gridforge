@@ -81,3 +81,30 @@ def test_offer_audit_validates_input(api_client, monkeypatch):
         "/market/offer-audit", json={"date": "2019-01-01", "offers": [{"resource": "X"}]}
     )
     assert nodata.status_code == 404
+
+
+def test_marginal_map_endpoint(api_client, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", DD)
+    resp = api_client.get(
+        "/market/marginal-map", params={"start": "2024-03-01", "end": "2024-03-10"}
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["n_hours"] > 0 and "cells" in body
+    assert all("resource" not in c and "resource_name" not in c for c in body["cells"])
+
+
+def test_marginal_map_validates_range_and_tol(api_client, monkeypatch):
+    monkeypatch.setenv("DATA_DIR", DD)
+    long = api_client.get(
+        "/market/marginal-map", params={"start": "2023-01-01", "end": "2024-12-31"}
+    )
+    assert long.status_code == 422
+    bad_tol = api_client.get(
+        "/market/marginal-map", params={"start": "2024-03-01", "end": "2024-03-02", "tol": 0.9}
+    )
+    assert bad_tol.status_code == 422
+    nodata = api_client.get(
+        "/market/marginal-map", params={"start": "2019-01-01", "end": "2019-01-02"}
+    )
+    assert nodata.status_code == 404

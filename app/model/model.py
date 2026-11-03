@@ -325,6 +325,7 @@ class UnitCommitmentModel:
         dual of a MILP is not a meaningful marginal price; this fix-and-resolve
         is the standard ISO pricing run.
         """
+        solver_params = self._with_exact_mip_gap(solver, solver_params)
         # Duals of a MILP are not marginal prices, and solver interfaces such as
         # the legacy `appsi_highs` wrapper raise "Solver does not currently have
         # valid duals" when asked to import them after a MIP solve. Keep the
@@ -345,6 +346,18 @@ class UnitCommitmentModel:
         if compute_prices:
             self._solve_pricing_lp(solver=solver, solver_params=solver_params, **kwargs)
         return results
+
+    @staticmethod
+    def _with_exact_mip_gap(solver: str, solver_params: dict) -> dict:
+        """HiGHS stops at a 1e-4 relative MIP gap by default and still reports
+        `optimal`. Prices are duals of the LP with the commitment fixed, so a
+        slightly worse commitment can move an hourly price by >100k COP/MWh
+        (observed on real XM days 2026-02-10 and 2026-09-15, vs cbc, which
+        proves optimality). Default to an exact gap; an explicit
+        `mip_rel_gap` in `solver_params` wins."""
+        if solver in ("appsi_highs", "highs"):
+            return {"mip_rel_gap": 0.0, **solver_params}
+        return solver_params
 
     def _solve_pricing_lp(self, solver: str = "cbc", solver_params: dict = {}, **kwargs):
         """Fix integers to their MILP solution and re-solve as an LP to obtain

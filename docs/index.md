@@ -85,6 +85,11 @@ recientes es consistente con la heurística de ofertas estimadas.
     <p><a href="{{ "/roadmap-aplicacion-despacho.html" | relative_url }}">Ver →</a></p>
   </div>
   <div class="card">
+    <h3>Desarrollo agentic</h3>
+    <p>Ciclo spec → plan → implementación, reglas persistentes y skills propias del repo.</p>
+    <p><a href="{{ "/desarrollo-agentic.html" | relative_url }}">Ver →</a></p>
+  </div>
+  <div class="card">
     <h3>README del repositorio</h3>
     <p>Instalación, datos requeridos, estructura y guía de uso completa.</p>
     <p><a href="https://github.com/jccamargo94/gridforge">Ver →</a></p>

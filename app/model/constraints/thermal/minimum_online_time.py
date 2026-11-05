@@ -54,3 +54,26 @@ def minimum_online_time_for_offline_gen_rule_last_section(
             return sum(model.z[g, dt] - model.zup[g, dt] for dt in summation_index) >= 0
         return pyo.Constraint.Skip
     return pyo.Constraint.Skip
+
+
+def add_minimum_online_time_disaggregated(model) -> None:
+    """Disaggregated (Rajan-Takriti style) alternative to the aggregated window rule.
+
+    Replaces ``sum(z[t..t+TMG-1]) >= TMG * zup[t]`` by one inequality per period of
+    the window, ``z[t'] >= zup[t]``. Both are equivalent on integer points, but the
+    disaggregated form has a tighter LP relaxation (at the cost of more rows).
+    Same index range as ``minimum_online_time_rule_for_offline_gen_rule``.
+    """
+    periods = list(model.T)
+    n = len(periods)
+    model.minimum_online_time_disaggregated = pyo.ConstraintList(
+        doc="Disaggregated minimum online time: z[g,t'] >= zup[g,t] for t' in window"
+    )
+    for g in model.G:
+        tmg = int(model.TMG[g])
+        for t_num in range(int(model.Lr[g]) + 1, n - tmg + 1):
+            t = periods[t_num - 1]
+            for idx in range(t_num, t_num + tmg):
+                model.minimum_online_time_disaggregated.add(
+                    model.z[g, periods[idx]] >= model.zup[g, t]
+                )

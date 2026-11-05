@@ -1,4 +1,5 @@
 from .minimum_online_time import (
+    add_minimum_online_time_disaggregated,
     compute_Lr,
     minimum_online_time_for_offline_gen_rule_last_section,
     minimum_online_time_rule_for_offline_gen_rule,
@@ -17,6 +18,7 @@ from .startup_shutdown import (
 )
 
 __all__ = [
+    "add_minimum_online_time_disaggregated",
     "compute_Lr",
     "minimum_online_time_rule_for_online_gen_rule",
     "minimum_online_time_rule_for_offline_gen_rule",

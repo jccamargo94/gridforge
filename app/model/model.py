@@ -21,6 +21,7 @@ from app.model.constraints.bess.soc import (
     same_soc_start_and_end,
 )
 from app.model.constraints.thermal import (
+    add_minimum_online_time_disaggregated,
     compute_Lr,
     down_ramps_thermal_gen,
     exclusive_ramp_down_effective_constraint,
@@ -41,7 +42,18 @@ from app.schemas.case import DispatchCase, DispatchLevel
 
 
 class UnitCommitmentModel:
-    def __init__(self, case: DispatchCase):
+    MIN_UP_FORMULATIONS = ("aggregated", "disaggregated")
+
+    def __init__(self, case: DispatchCase, min_up_formulation: str = "aggregated"):
+        """``min_up_formulation`` selects the minimum-online-time formulation used
+        at ``ideal`` level. ``aggregated`` (default) is the historical one; the
+        alternative exists for benchmarking (see ``benchmarks/formulations.py``)."""
+        if min_up_formulation not in self.MIN_UP_FORMULATIONS:
+            raise ValueError(
+                f"min_up_formulation must be one of {self.MIN_UP_FORMULATIONS}, "
+                f"got {min_up_formulation!r}"
+            )
+        self._min_up_formulation = min_up_formulation
         self._model = pyo.ConcreteModel()
         self._dispatch_case = case
         self._model._dispatch_type = self._legacy_type_tag(case)
@@ -392,12 +404,15 @@ class UnitCommitmentModel:
             rule=minimum_online_time_rule_for_online_gen_rule,
             doc=minimum_online_time_rule_for_online_gen_rule.__doc__,
         )
-        self._model.minimum_online_time_rule_for_offline_gen_rule = pyo.Constraint(
-            self._model.G,
-            self._model.T,
-            rule=minimum_online_time_rule_for_offline_gen_rule,
-            doc=minimum_online_time_rule_for_offline_gen_rule.__doc__,
-        )
+        if self._min_up_formulation == "disaggregated":
+            add_minimum_online_time_disaggregated(self._model)
+        else:
+            self._model.minimum_online_time_rule_for_offline_gen_rule = pyo.Constraint(
+                self._model.G,
+                self._model.T,
+                rule=minimum_online_time_rule_for_offline_gen_rule,
+                doc=minimum_online_time_rule_for_offline_gen_rule.__doc__,
+            )
         self._model.minimum_online_time_for_offline_gen_rule_last_section = pyo.Constraint(
             self._model.G,
             self._model.T,

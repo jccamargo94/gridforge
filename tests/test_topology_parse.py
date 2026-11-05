@@ -181,3 +181,38 @@ def test_parse_map_lines_extracts_structured_endpoints():
             "sub2": "LA PAZ (BOGOTA)",
         }
     ]
+
+
+def test_parse_generators_fills_coordinates_from_plant_catalogs():
+    capacity = {
+        "dataReport": [
+            {
+                "name": "Planta Solar",
+                "dispatchedType": [
+                    {
+                        "generatorTypes": [
+                            {
+                                "elements": [
+                                    {
+                                        "elementName": "ALMA II",
+                                        "netEffectiveCapacity": 10.0,
+                                        "subArea": "SubArea Arauca",
+                                    },
+                                    {
+                                        "elementName": "SIN COORD",
+                                        "netEffectiveCapacity": 5.0,
+                                        "subArea": "SubArea Arauca",
+                                    },
+                                ]
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+    solar = {"data": [{"elementName": " alma  ii ", "latitude": 6.99, "longitude": -70.69}]}
+    gens = parse.parse_generators(capacity, {}, {}, solar, {})
+    by_name = {g["name"]: g for g in gens}
+    assert (by_name["ALMA II"]["latitude"], by_name["ALMA II"]["longitude"]) == (6.99, -70.69)
+    assert by_name["SIN COORD"]["latitude"] is None

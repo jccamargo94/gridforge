@@ -77,3 +77,16 @@ def test_build_converts_reactance_to_per_unit():
     branch = network.branches[0]
     # X_pu = X_ohm × baseMVA / kV² = 66.125 × 100 / 115² = 0.5
     assert abs(branch.reactance - 0.5) < 1e-9
+
+
+def test_nearest_zone_uses_coordinates_and_centroid_fallback():
+    from app.data.topology.build import _nearest_zone
+
+    subs = [
+        {"name": "A", "subarea": "S", "latitude": 0.0, "longitude": 0.0},
+        {"name": "B", "subarea": "S", "latitude": 10.0, "longitude": 10.0},
+        {"name": "C", "subarea": "S", "latitude": 5.1, "longitude": 5.1},
+    ]
+    assert _nearest_zone(9.0, 9.0, subs, "S") == "B"
+    # no coordinates -> substation closest to the subarea centroid (C), not the first (A)
+    assert _nearest_zone(None, None, subs, "S") == "C"

@@ -87,6 +87,30 @@ def parse_map_lines(payload: Any) -> list[dict]:
     return lines
 
 
+def _coord_index(*payloads: Any) -> dict[str, tuple[float, float]]:
+    """Map normalized plant name -> (lat, lon) from the hydro/solar/wind PARATEC payloads.
+
+    Each payload is ``{"data": [{"elementName", "latitude", "longitude", ...}]}``.
+    Rows without both coordinates are skipped (many hydro plants have none).
+    Thermal plants carry no coordinates in PARATEC.
+    """
+    index: dict[str, tuple[float, float]] = {}
+    for payload in payloads:
+        rows = _data(payload)
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            lat, lon = row.get("latitude"), row.get("longitude")
+            name = row.get("elementName")
+            if name and lat is not None and lon is not None:
+                index[_norm_name(name)] = (float(lat), float(lon))
+    return index
+
+
+def _norm_name(name: str) -> str:
+    return " ".join(str(name).upper().split())
+
+
 def parse_generators(
     capacity_payload: Any,
     thermal_payload: Any,
@@ -97,6 +121,7 @@ def parse_generators(
     # Capacity catalog is the authoritative per-element list with subarea.
     # Walk its nested dataReport[] structure to collect (name, capacity, subarea).
     gens: list[dict] = []
+    coords = _coord_index(hydro_payload, solar_payload, wind_payload)
     capacity_root = _data(capacity_payload)
     if isinstance(capacity_root, dict):
         capacity_root = capacity_root.get("dataReport")
@@ -108,6 +133,11 @@ def parse_generators(
                     if cap <= 0:
                         continue
                     fuel = _fuel_for(plant_group)
+                    # Prefer coordinates on the capacity element itself; else look the
+                    # plant up by name in the hydro/solar/wind catalogs.
+                    lat, lon = element.get("latitude"), element.get("longitude")
+                    if lat is None or lon is None:
+                        lat, lon = coords.get(_norm_name(element["elementName"]), (None, None))
                     gens.append(
                         {
                             "name": element["elementName"],
@@ -115,8 +145,8 @@ def parse_generators(
                             "fuel": fuel,
                             "marginal_cost": _cost_for(fuel),
                             "subarea": element.get("subArea") or "",
-                            "latitude": None,
-                            "longitude": None,
+                            "latitude": lat,
+                            "longitude": lon,
                         }
                     )
     return gens

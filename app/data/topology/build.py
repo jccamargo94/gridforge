@@ -27,6 +27,13 @@ def _nearest_zone(lat, lon, subs, subarea=None) -> str:
     pool = [s for s in subs if subarea is None or s["subarea"] == subarea]
     if not pool:
         pool = subs  # fall back to global nearest
+    if lat is None or lon is None:
+        # No plant coordinates (e.g. thermals): use the substation closest to the
+        # centroid of the pool instead of an arbitrary first entry.
+        pts = [(s["latitude"], s["longitude"]) for s in pool if s["latitude"] is not None]
+        if pts:
+            lat = sum(p[0] for p in pts) / len(pts)
+            lon = sum(p[1] for p in pts) / len(pts)
     best = min(pool, key=lambda s: _haversine_km(lat, lon, s["latitude"], s["longitude"]))
     return best["name"]
 

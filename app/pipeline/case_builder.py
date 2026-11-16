@@ -599,8 +599,12 @@ def build_case(
         gene_mw = load_gene_day(dd, DISPATCH_DATE)
         gene_mw = gene_mw.assign(gen=gene_mw["gen"] * 1e-3)
         thermals = dispo.loc[dispo["gen_type"] == "TERMICA", "resource_name"].unique()
+        # The loader already scales raw bolsa prices to COP/MWh. Align the real
+        # spot series to the exact case timestamps; a missing date leaves NaNs
+        # and therefore fixes nothing (graceful degradation).
+        spot = precio_bolsa.groupby("datetime")["precio_bolsa"].mean().reindex(timestamps)
         pmax_fixed, demand_fixed, fixed = apply_thermal_real_generation(
-            param_data["Pmax"], param_data["demand"], beta, thermals, gene_mw
+            param_data["Pmax"], param_data["demand"], beta, thermals, gene_mw, spot=spot
         )
         param_data["Pmax"] = pmax_fixed
         param_data["demand"] = demand_fixed
@@ -608,6 +612,18 @@ def build_case(
             f"WARNING: thermal_real_generation activo: {len(fixed)} termicas fijadas a su "
             f"generacion real (Gene) en {DISPATCH_DATE}: {sorted(fixed)}"
         )
+
+    if case.level == DispatchLevel.ideal:
+        # Enforce the real minimum operating level (OFEI MO, already in MW) as
+        # the model's Pmin. Only (i, t) keys in I x T, clamped to the effective
+        # Pmax (after thermal_real_generation) to keep pout >= Pmin*z feasible.
+        # PREIDEAL keeps {} and model.py's max_min_op default.
+        model_keys = {(gen, ts) for gen in set_data["I"] for ts in set_data["T"]}
+        param_data["Pmin"] = {
+            key: float(min(float(value), float(param_data["Pmax"].get(key, value))))
+            for key, value in Pmin.items()
+            if key in model_keys
+        }
 
     if case.bess_scenario is not None:
         bess_names, bess_params_model = bess_scenario_to_params(case.bess_scenario)

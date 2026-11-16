@@ -1,21 +1,18 @@
-"""Termicas fijas a su generacion real (inflexibilidades) en el despacho ideal.
+"""Fix inflexible thermal units to their real generation in the ideal dispatch.
 
-El precio ideal (CREG 051/2009, 011/2010) excluye las inflexibilidades: la
-energia de plantas que generaron fuera de merito no fija precio. Aproximacion
-*residual*: la generacion real de cada termica se descuenta de la demanda y de su
-``Pmax`` horario; la oferta de la planta queda intacta para su disponibilidad
-restante, de modo que sigue pudiendo fijar el precio cuando es marginal.
+The ideal price (CREG 051/2009, 011/2010) excludes inflexibilities: energy from
+plants that generated out of merit must not set the price. The residual
+approximation subtracts each thermal unit's real generation from hourly ``Pmax``
+and from demand. The unit's offer is left untouched for its remaining
+availability, so it can still set the marginal price when it is economic.
 
-Validado en 29 fechas reales de 2026 (issue #63): WAPE medio sin dI 11,21 -> 7,09;
-20 fechas mejoran, 8 empeoran (dias caros de punta, donde la generacion termica
-real incluye energia economica y no solo inflexible).
+Selection is per (generator, hour) and uses the real bolsa spot price: a unit is
+fixed only in hours where its offer exceeds spot (it would not be economic
+there). Units in merit keep their availability. When spot data is unavailable or
+empty, no generation is fixed.
 """
 
 import pandas as pd
-
-# Solo termicas con oferta por encima de este valor (COP/MWh): las baratas no son
-# candidatas a inflexibilidad. Valor usado en la validacion; no se ha calibrado.
-MIN_OFFER = 125_000.0
 
 
 def apply_thermal_real_generation(
@@ -25,29 +22,31 @@ def apply_thermal_real_generation(
     thermal_names,
     gene_mw: pd.DataFrame,
     *,
-    min_offer: float = MIN_OFFER,
+    spot: pd.Series,
 ):
-    """Devuelve ``(Pmax, demand, fixed)`` nuevos.
+    """Return new ``(Pmax, demand, fixed)``.
 
-    ``gene_mw``: columnas ``datetime, resource_name, gen`` ya en MW.
-    ``fixed``: ``{planta: MW totales del dia}`` de las plantas efectivamente fijadas.
+    ``gene_mw``: columns ``datetime, resource_name, gen``, already in MW.
+    ``spot``: hourly real bolsa spot price (COP/MWh) indexed by timestamp.
+    ``fixed``: ``{plant: total MW fixed over the day}`` for units actually fixed.
     """
     gene = {}
     for name, grp in gene_mw.groupby(gene_mw["resource_name"].str.upper().str.strip()):
         gene[name] = grp.groupby("datetime")["gen"].sum()
 
-    selected = [
-        g
-        for g in thermal_names
-        if g in beta.index and beta[g] > min_offer and g.upper().strip() in gene
-    ]
+    candidates = [g for g in thermal_names if g in beta.index and g.upper().strip() in gene]
     new_pmax = dict(Pmax)
     is_dict = isinstance(demand, dict)
     dem = pd.Series(demand, dtype=float).copy()
     fixed: dict[str, float] = {}
     for ts in dem.index:
+        spot_t = spot.get(ts)
+        if spot_t is None or pd.isna(spot_t):
+            continue
         removed = 0.0
-        for g in selected:
+        for g in candidates:
+            if beta[g] <= spot_t:
+                continue
             key = (g, ts)
             if key not in new_pmax:
                 continue

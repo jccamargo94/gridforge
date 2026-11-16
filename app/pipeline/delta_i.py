@@ -65,6 +65,29 @@ def estimate_delta_i(
     return best, matched(best)
 
 
+def price_error_decomposition(y_true, y_pred, delta: float) -> dict[str, float]:
+    """Split model-vs-bolsa price error into the part explained by the missing
+    additive ΔI and the residual MPO error, via the bolsa-equivalent series
+    (y_pred + delta). WAPE uses the SAME denominator (sum|y_true|) for both
+    sides so the difference is a meaningful decomposition. No model changes."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    n = min(len(y_true), len(y_pred))
+    y_true, y_pred = y_true[:n], y_pred[:n]
+    base = price_metrics(y_true, y_pred)
+    equiv = price_metrics(y_true, y_pred + delta)
+    wape_base = base["wape"]
+    wape_equiv = equiv["wape"]
+    return {
+        "bolsa_equivalent_delta": float(delta),
+        "wape_base": float(wape_base),
+        "wape_bolsa_equivalent": float(wape_equiv),
+        "wape_closed_by_delta": float(wape_base - wape_equiv),
+        "bias_base": float(base["bias"]),
+        "bias_bolsa_equivalent": float(equiv["bias"]),
+    }
+
+
 def delta_i_metrics(
     dispatch_date: date, y_true, y_pred, *, data_dir: str = "data"
 ) -> dict[str, float]:
@@ -106,4 +129,5 @@ def delta_i_metrics(
     out.update(
         {f"{k}_ex_delta": float(v) for k, v in ex.items() if k in ("rmse", "mae", "bias", "wape")}
     )
+    out.update(price_error_decomposition(y_true[:n], y_pred[:n], delta))
     return out

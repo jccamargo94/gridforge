@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -27,6 +28,38 @@ def test_evaluate_saved_run_writes_metrics_csv(tmp_path):
     )
     assert metrics["mae"] == 0.0
     assert (tmp_path / "metrics-2024-04-18-preideal.csv").exists()
+
+
+def test_evaluate_writes_bolsa_equivalent_price_series(tmp_path):
+    """Ideal runs must emit a separate flagged series (model MPO + inferred dI)
+    without modifying the saved marginal_price CSV. Fixture dI for 2024-04-18
+    is 20_000 COP/MWh (bolsa 200k, marginal offer 180k)."""
+    fixture_dir = Path(__file__).parent / "fixtures" / "xm_smoke"
+    price_df = pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-04-18", periods=24, freq="1h"),
+            "ideal_marginal_price": [180_000.0] * 24,
+        }
+    )
+    price_df.to_csv(tmp_path / "marginal_price-2024-04-18-ideal.csv", index=False)
+
+    metrics = evaluate_saved_run(
+        date(2024, 4, 18), DispatchLevel.ideal, out=str(tmp_path), data_dir=str(fixture_dir)
+    )
+    assert metrics["delta_i"] == 20_000.0
+
+    series_path = tmp_path / "bolsa-equivalent-price-2024-04-18-ideal.csv"
+    assert series_path.exists()
+    series = pd.read_csv(series_path, parse_dates=["datetime"])
+    assert list(series.columns) == ["datetime", "model_mpo", "bolsa_equivalent_mpo"]
+    assert len(series) == 24
+    # hand-checked: 180_000 (model) + 20_000 (dI) = 200_000 COP/MWh
+    assert series.iloc[0]["model_mpo"] == 180_000.0
+    assert series.iloc[0]["bolsa_equivalent_mpo"] == 200_000.0
+
+    # the source marginal_price CSV must keep its exact shape (no added column)
+    source = pd.read_csv(tmp_path / "marginal_price-2024-04-18-ideal.csv")
+    assert list(source.columns) == ["datetime", "ideal_marginal_price"]
 
 
 def test_evaluate_saved_run_missing_price_csv_raises(tmp_path):

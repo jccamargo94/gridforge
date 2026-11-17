@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from app.pipeline import delta_i
 
@@ -56,6 +57,35 @@ def test_metrics_on_fixture_remove_the_shift_from_the_error():
     assert (
         out["mae_ex_delta"] == 0.0 and out["bias_ex_delta"] == 0.0 and out["wape_ex_delta"] == 0.0
     )
+    assert out["bolsa_equivalent_delta"] == 20_000.0
+    assert out["wape_base"] == 0.1
+    assert out["wape_bolsa_equivalent"] == 0.0
+    assert out["wape_closed_by_delta"] == 0.1
+    assert out["bias_base"] == -20_000.0
+    assert out["bias_bolsa_equivalent"] == 0.0
+
+
+def test_price_error_decomposition_splits_wape():
+    # y_true=[100,200,300,400], y_pred=[90,180,270,360] -> base |err| sum = 100, denom = 1000
+    # delta=20 -> bolsa_eq=[110,200,290,380] -> |err| sum = 40 (same denom 1000)
+    out = delta_i.price_error_decomposition([100, 200, 300, 400], [90, 180, 270, 360], delta=20)
+    assert out == pytest.approx(
+        {
+            "bolsa_equivalent_delta": 20.0,
+            "wape_base": 0.1,
+            "wape_bolsa_equivalent": 0.04,
+            "wape_closed_by_delta": 0.06,
+            "bias_base": -25.0,
+            "bias_bolsa_equivalent": -5.0,
+        }
+    )
+
+
+def test_price_error_decomposition_zero_delta_is_noop():
+    out = delta_i.price_error_decomposition([100, 200], [100, 200], delta=0)
+    assert out["wape_base"] == 0.0
+    assert out["wape_bolsa_equivalent"] == 0.0
+    assert out["wape_closed_by_delta"] == 0.0
 
 
 def test_metrics_empty_when_reference_is_not_the_bolsa_price():

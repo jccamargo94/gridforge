@@ -61,7 +61,24 @@ def evaluate_saved_run(
     n = min(len(xm), len(model_mpo))
     metrics = price_metrics(xm[:n], model_mpo[:n])
     if level in (DispatchLevel.ideal, DispatchLevel.lmp):
-        metrics.update(delta_i_metrics(dispatch_date, xm[:n], model_mpo[:n], data_dir=data_dir))
+        delta_info = delta_i_metrics(dispatch_date, xm[:n], model_mpo[:n], data_dir=data_dir)
+        metrics.update(delta_info)
+        if delta_info:
+            # Separate flagged series: model MPO shifted by the inferred dI.
+            # Never add a column to the marginal_price CSV -- positional readers
+            # in evaluate.py, services/api/main.py and app/scheduler/reeval.py
+            # depend on its exact shape.
+            delta = delta_info["delta_i"]
+            series = pd.DataFrame(
+                {
+                    "datetime": price_df["datetime"].to_numpy()[:n],
+                    "model_mpo": model_mpo[:n],
+                    "bolsa_equivalent_mpo": model_mpo[:n] + delta,
+                }
+            )
+            series_name = f"bolsa-equivalent-price-{dispatch_date}-{t}.csv"
+            with storage.open(series_name, "w") as f:
+                series.to_csv(f, index=False)
 
     metrics_name = f"metrics-{dispatch_date}-{t}.csv"
     with storage.open(metrics_name, "w") as f:
